@@ -170,3 +170,72 @@ class OTP(Base):
     __table_args__ = (
         UniqueConstraint('user_id', 'verification_type', name='unique_user_verification_type'),
     )
+
+
+class Follow(Base):
+    """User follow relationships"""
+    __tablename__ = "follows"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    follower_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    following_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    # Status
+    is_active = Column(Boolean, default=True, nullable=False)
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint('follower_id', 'following_id', name='unique_follower_following'),
+    )
+
+
+class Block(Base):
+    """User block relationships"""
+    __tablename__ = "blocks"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    blocker_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    blocked_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint('blocker_id', 'blocked_id', name='unique_blocker_blocked'),
+    )
+
+
+class Verification(Base):
+    """User verification status (blue checkmarks)"""
+    __tablename__ = "verifications"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True, index=True)
+    is_verified = Column(Boolean, default=False, nullable=False)
+    verification_type = Column(String(50), nullable=True)  # influencer, business, artist, etc.
+    verified_by = Column(UUID(as_uuid=True), nullable=True)  # Admin user who verified
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    verified_at = Column(DateTime, nullable=True)
+
+
+class Badge(Base):
+    """Achievement badges for users"""
+    __tablename__ = "badges"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    badge_type = Column(String(100), nullable=False)  # early_adopter, creator_fund, million_followers, etc.
+    badge_name = Column(String(255), nullable=False)
+    badge_icon_url = Column(String(500), nullable=True)
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint('user_id', 'badge_type', name='unique_user_badge'),
+    )

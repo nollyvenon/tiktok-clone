@@ -12,7 +12,7 @@ from contextlib import asynccontextmanager
 
 from app.config import settings
 from app.database import init_db, close_db
-from app.routes import auth
+from app.routes import auth, profiles
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -80,6 +80,7 @@ async def root():
 
 # Include routers
 app.include_router(auth.router, prefix="/api", tags=["Authentication"])
+app.include_router(profiles.router, prefix="/api", tags=["Profiles"])
 # TODO: Add more routers as they are implemented
 # app.include_router(videos.router, prefix="/api/videos", tags=["Videos"])
 # app.include_router(users.router, prefix="/api/users", tags=["Users"])

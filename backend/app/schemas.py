@@ -122,6 +122,125 @@ class VerifyOTPRequest(BaseModel):
 
 
 # ============================================================================
+# Profile Schemas
+# ============================================================================
+
+class UserPublicProfile(BaseModel):
+    """Public user profile (minimal info)"""
+    id: UUID
+    username: str
+    avatar_url: Optional[str] = None
+    is_verified: bool
+    is_creator: bool
+
+    class Config:
+        from_attributes = True
+
+
+class UserFullProfile(UserBase):
+    """Full user profile with all details"""
+    id: UUID
+    is_verified: bool
+    is_active: bool
+    role: UserRole
+    is_creator: bool
+    two_factor_enabled: bool
+    created_at: datetime
+    updated_at: datetime
+    last_login: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class UserProfileUpdate(BaseModel):
+    """Update user profile"""
+    first_name: Optional[str] = Field(None, max_length=100)
+    last_name: Optional[str] = Field(None, max_length=100)
+    bio: Optional[str] = Field(None, max_length=150)
+    avatar_url: Optional[str] = None
+    cover_url: Optional[str] = None
+    website: Optional[str] = Field(None, max_length=255)
+
+
+class ProfileStatistics(BaseModel):
+    """User profile statistics"""
+    followers_count: int
+    following_count: int
+    videos_count: int
+    likes_count: int
+    total_views: int
+
+
+class FollowResponse(BaseModel):
+    """Follow/Unfollow response"""
+    is_following: bool
+    followers_count: int
+    following_count: int
+
+
+class FollowersResponse(BaseModel):
+    """List of followers"""
+    users: list[UserPublicProfile]
+    total: int
+    cursor: Optional[str] = None
+
+
+class FollowingResponse(BaseModel):
+    """List of following"""
+    users: list[UserPublicProfile]
+    total: int
+    cursor: Optional[str] = None
+
+
+class BlockResponse(BaseModel):
+    """Block/Unblock response"""
+    is_blocked: bool
+    message: str
+
+
+class BlockedUsersResponse(BaseModel):
+    """List of blocked users"""
+    users: list[UserPublicProfile]
+    total: int
+
+
+class VerificationBadge(BaseModel):
+    """User verification badge"""
+    is_verified: bool
+    verification_type: Optional[str] = None
+    verified_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class UserBadge(BaseModel):
+    """User achievement badge"""
+    id: UUID
+    badge_type: str
+    badge_name: str
+    badge_icon_url: Optional[str] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class ProfileResponse(BaseModel):
+    """Complete profile response"""
+    user: UserFullProfile
+    statistics: ProfileStatistics
+    verification: Optional[VerificationBadge] = None
+    badges: list[UserBadge] = []
+    is_following: bool = False
+    is_blocked: bool = False
+
+    class Config:
+        from_attributes = True
+
+
+# ============================================================================
 # User Schemas
 # ============================================================================
 
