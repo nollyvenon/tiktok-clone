@@ -239,3 +239,129 @@ class Badge(Base):
     __table_args__ = (
         UniqueConstraint('user_id', 'badge_type', name='unique_user_badge'),
     )
+
+
+class VideoStatus(str, enum.Enum):
+    """Video status"""
+    DRAFT = "draft"
+    PROCESSING = "processing"
+    PUBLISHED = "published"
+    ARCHIVED = "archived"
+    DELETED = "deleted"
+
+
+class Video(Base):
+    """User videos"""
+    __tablename__ = "videos"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    # Content
+    title = Column(String(255), nullable=True)
+    description = Column(Text, nullable=True)
+    video_url = Column(String(500), nullable=False)
+    thumbnail_url = Column(String(500), nullable=True)
+    duration = Column(Integer, nullable=True)  # Duration in seconds
+
+    # Metadata
+    hashtags = Column(String(500), nullable=True)  # Comma-separated
+    music_id = Column(UUID(as_uuid=True), nullable=True)  # Reference to music/sound
+    location = Column(String(255), nullable=True)
+
+    # Status & Visibility
+    status = Column(Enum(VideoStatus), default=VideoStatus.DRAFT, nullable=False, index=True)
+    is_public = Column(Boolean, default=True, nullable=False)
+    is_pinned = Column(Boolean, default=False, nullable=False)
+    allow_comments = Column(Boolean, default=True, nullable=False)
+    allow_duets = Column(Boolean, default=True, nullable=False)
+    allow_stitches = Column(Boolean, default=True, nullable=False)
+
+    # Analytics (denormalized for performance)
+    views_count = Column(Integer, default=0, nullable=False)
+    likes_count = Column(Integer, default=0, nullable=False)
+    comments_count = Column(Integer, default=0, nullable=False)
+    shares_count = Column(Integer, default=0, nullable=False)
+    bookmarks_count = Column(Integer, default=0, nullable=False)
+
+    # Engagement metrics
+    completion_rate = Column(Integer, default=0, nullable=False)  # Percentage
+    average_watch_time = Column(Integer, default=0, nullable=False)  # Seconds
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    published_at = Column(DateTime, nullable=True, index=True)
+    deleted_at = Column(DateTime, nullable=True)
+
+    # Relationships
+    likes = relationship("Like", back_populates="video", cascade="all, delete-orphan")
+    bookmarks = relationship("Bookmark", back_populates="video", cascade="all, delete-orphan")
+    views = relationship("View", back_populates="video", cascade="all, delete-orphan")
+
+
+class Like(Base):
+    """Video likes"""
+    __tablename__ = "likes"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    video_id = Column(UUID(as_uuid=True), ForeignKey("videos.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    # Relationships
+    video = relationship("Video", back_populates="likes")
+
+    __table_args__ = (
+        UniqueConstraint('user_id', 'video_id', name='unique_user_video_like'),
+    )
+
+
+class Bookmark(Base):
+    """Bookmarked/saved videos"""
+    __tablename__ = "bookmarks"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    video_id = Column(UUID(as_uuid=True), ForeignKey("videos.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    # Relationships
+    video = relationship("Video", back_populates="bookmarks")
+
+    __table_args__ = (
+        UniqueConstraint('user_id', 'video_id', name='unique_user_video_bookmark'),
+    )
+
+
+class View(Base):
+    """Video views/watches for analytics"""
+    __tablename__ = "views"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    video_id = Column(UUID(as_uuid=True), ForeignKey("videos.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    # Watch metrics
+    watch_time = Column(Integer, default=0, nullable=False)  # Seconds watched
+    completed = Column(Boolean, default=False, nullable=False)  # Did user watch to end?
+
+    # Device info
+    device_type = Column(String(50), nullable=True)  # mobile, desktop, tablet
+    platform = Column(String(50), nullable=True)  # iOS, Android, Web
+    country = Column(String(2), nullable=True)  # ISO country code
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    # Relationships
+    video = relationship("Video", back_populates="views")
+
+    __table_args__ = (
+        UniqueConstraint('user_id', 'video_id', 'created_at', name='unique_user_video_view_day'),
+    )

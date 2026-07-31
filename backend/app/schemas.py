@@ -241,6 +241,120 @@ class ProfileResponse(BaseModel):
 
 
 # ============================================================================
+# Video Schemas
+# ============================================================================
+
+class VideoCreate(BaseModel):
+    """Create video request"""
+    title: Optional[str] = Field(None, max_length=255)
+    description: Optional[str] = Field(None, max_length=2200)
+    video_url: str = Field(..., max_length=500)
+    thumbnail_url: Optional[str] = None
+    duration: Optional[int] = None
+    hashtags: Optional[str] = None
+    music_id: Optional[UUID] = None
+    location: Optional[str] = None
+    is_public: bool = True
+    allow_comments: bool = True
+    allow_duets: bool = True
+    allow_stitches: bool = True
+
+
+class VideoUpdate(BaseModel):
+    """Update video request"""
+    title: Optional[str] = Field(None, max_length=255)
+    description: Optional[str] = Field(None, max_length=2200)
+    thumbnail_url: Optional[str] = None
+    hashtags: Optional[str] = None
+    is_public: Optional[bool] = None
+    allow_comments: Optional[bool] = None
+    allow_duets: Optional[bool] = None
+    allow_stitches: Optional[bool] = None
+
+
+class VideoResponse(BaseModel):
+    """Video response"""
+    id: UUID
+    user_id: UUID
+    title: Optional[str] = None
+    description: Optional[str] = None
+    video_url: str
+    thumbnail_url: Optional[str] = None
+    duration: Optional[int] = None
+    hashtags: Optional[str] = None
+    location: Optional[str] = None
+    is_public: bool
+    views_count: int
+    likes_count: int
+    comments_count: int
+    shares_count: int
+    bookmarks_count: int
+    completion_rate: int
+    created_at: datetime
+    published_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class VideoDetailResponse(VideoResponse):
+    """Detailed video response with user info"""
+    user: UserPublicProfile
+    is_liked: bool = False
+    is_bookmarked: bool = False
+    allow_comments: bool
+    allow_duets: bool
+    allow_stitches: bool
+
+    class Config:
+        from_attributes = True
+
+
+class FeedResponse(BaseModel):
+    """Video feed response"""
+    videos: list[VideoDetailResponse]
+    cursor: Optional[str] = None  # For pagination
+    total: Optional[int] = None
+
+
+class LikeResponse(BaseModel):
+    """Like/unlike response"""
+    is_liked: bool
+    likes_count: int
+
+
+class BookmarkResponse(BaseModel):
+    """Bookmark/unbookmark response"""
+    is_bookmarked: bool
+    bookmarks_count: int
+
+
+class ViewTrackingRequest(BaseModel):
+    """Track video view request"""
+    watch_time: int = Field(..., ge=0)  # Seconds watched
+    completed: bool = False
+    device_type: Optional[str] = None
+    platform: Optional[str] = None
+    country: Optional[str] = None
+
+
+class VideoAnalytics(BaseModel):
+    """Video analytics"""
+    video_id: UUID
+    views: int
+    likes: int
+    comments: int
+    shares: int
+    bookmarks: int
+    completion_rate: float
+    average_watch_time: int
+    engagement_rate: float
+
+    class Config:
+        from_attributes = True
+
+
+# ============================================================================
 # User Schemas
 # ============================================================================
 
