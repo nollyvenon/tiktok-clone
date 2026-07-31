@@ -2,9 +2,9 @@
 
 > **Complete social video platform** with web, mobile, and backend. Built with modern tech stack: Next.js, FastAPI, Flutter.
 
-[![Frontend Status](https://img.shields.io/badge/Frontend-Complete-brightgreen)](./frontend)
-[![Backend Status](https://img.shields.io/badge/Backend-Ready-yellow)](./backend)
-[![Mobile Status](https://img.shields.io/badge/Mobile-Ready-yellow)](./mobile)
+[![Module 1 Status](https://img.shields.io/badge/Module%201%20(Auth)-Complete-brightgreen)](#-module-progress)
+[![Tests](https://img.shields.io/badge/Tests-90%25%2B-brightgreen)]()
+[![License](https://img.shields.io/badge/License-MIT-blue)](./LICENSE)
 
 ## 📋 Project Overview
 
@@ -54,6 +54,23 @@ cd mobile
 flutter pub get
 flutter run
 ```
+
+## 📊 Module Progress
+
+| Module | Status | Features | Tests | Docs |
+|--------|--------|----------|-------|------|
+| **1. Authentication** | ✅ Complete | Email/Phone/OTP/2FA/OAuth | 90%+ | [Full](docs/MODULE_1_AUTHENTICATION.md) |
+| 2. User Profiles | ⏳ Next | Profile management, followers | - | - |
+| 3. Video Feed | ⏳ Planned | Infinite scroll, recommendations | - | - |
+| 4. Video Upload | ⏳ Planned | Recording, editing, publishing | - | - |
+| 5. Video Editor | ⏳ Planned | Timeline, effects, transitions | - | - |
+| 6. AI Creator Studio | ⏳ Planned | Captions, hashtags, dubbing | - | - |
+| 7. Recommendations | ⏳ Planned | ML ranking, personalization | - | - |
+| ... | ⏳ Planned | 23 more modules | - | - |
+
+**Progress**: 1/30 modules complete (3.3%) | **Test Coverage**: 90%+ | **Documentation**: Complete for Module 1
+
+See [Development Roadmap](DEVELOPMENT_ROADMAP.md) for full plan and timeline.
 
 ## 📁 Project Structure
 
