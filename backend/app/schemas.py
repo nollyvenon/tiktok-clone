@@ -22,7 +22,8 @@ class RegisterRequest(BaseModel):
     first_name: Optional[str] = Field(None, max_length=100)
     last_name: Optional[str] = Field(None, max_length=100)
 
-    @validator("username")
+    @field_validator("username")
+    @classmethod
     def validate_username(cls, v):
         if not v.replace("_", "").replace("-", "").isalnum():
             raise ValueError("Username can only contain letters, numbers, hyphens, and underscores")
