@@ -1,0 +1,252 @@
+version: '3.9'
+
+services:
+  # ============================================================================
+  # DATABASES & CACHE
+  # ============================================================================
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: tiktok-postgres
+    environment:
+      POSTGRES_DB: tiktok_clone
+      POSTGRES_USER: tiktok_user
+      POSTGRES_PASSWORD: tiktok_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tiktok_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - tiktok_network
+
+  redis:
+    image: redis:7-alpine
+    container_name: tiktok-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - tiktok_network
+
+  # ============================================================================
+  # APPLICATION SERVICES
+  # ============================================================================
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: tiktok-backend
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://tiktok_user:tiktok_password@postgres:5432/tiktok_clone
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET_KEY: your_super_secret_key_change_in_production
+      ENVIRONMENT: development
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    networks:
+      - tiktok_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: tiktok-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+      NEXT_PUBLIC_WS_URL: ws://localhost:8000
+      NODE_ENV: development
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
+    command: npm run dev
+    networks:
+      - tiktok_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ============================================================================
+  # MONITORING & DEBUGGING TOOLS
+  # ============================================================================
+
+  adminer:
+    image: adminer
+    container_name: tiktok-adminer
+    ports:
+      - "8080:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+    depends_on:
+      - postgres
+    networks:
+      - tiktok_network
+    profiles:
+      - tools
+
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: tiktok-redis-commander
+    ports:
+      - "8081:8081"
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    depends_on:
+      - redis
+    networks:
+      - tiktok_network
+    profiles:
+      - tools
+
+  # ============================================================================
+  # MONITORING STACK (Optional)
+  # ============================================================================
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: tiktok-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    networks:
+      - tiktok_network
+    profiles:
+      - monitoring
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: tiktok-grafana
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    networks:
+      - tiktok_network
+    profiles:
+      - monitoring
+
+  # ============================================================================
+  # LOGGING STACK (Optional)
+  # ============================================================================
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.0.0
+    container_name: tiktok-elasticsearch
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+    ports:
+      - "9200:9200"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    networks:
+      - tiktok_network
+    profiles:
+      - logging
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.0.0
+    container_name: tiktok-kibana
+    ports:
+      - "5601:5601"
+    environment:
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+    depends_on:
+      - elasticsearch
+    networks:
+      - tiktok_network
+    profiles:
+      - logging
+
+volumes:
+  postgres_data:
+  redis_data:
+  prometheus_data:
+  grafana_data:
+  elasticsearch_data:
+  frontend_node_modules:
+
+networks:
+  tiktok_network:
+    driver: bridge
+
+# ============================================================================
+# USAGE GUIDE
+# ============================================================================
+#
+# Basic development (frontend + backend + databases):
+#   docker-compose up -d
+#
+# With debugging tools (add Adminer, Redis Commander):
+#   docker-compose --profile tools up -d
+#
+# With monitoring (add Prometheus, Grafana):
+#   docker-compose --profile monitoring up -d
+#
+# With logging (add ELK Stack):
+#   docker-compose --profile logging up -d
+#
+# Everything:
+#   docker-compose --profile tools --profile monitoring --profile logging up -d
+#
+# View logs:
+#   docker-compose logs -f frontend
+#   docker-compose logs -f backend
+#   docker-compose logs -f postgres
+#
+# Stop all:
+#   docker-compose down
+#
+# Remove volumes (WARNING: deletes data):
+#   docker-compose down -v
+#
+# Access services:
+#   Frontend:       http://localhost:3000
+#   Backend:        http://localhost:8000
+#   API Docs:       http://localhost:8000/docs
+#   Database Admin: http://localhost:8080
+#   Redis Admin:    http://localhost:8081
+#   Grafana:        http://localhost:3001 (admin/admin)
+#   Kibana:         http://localhost:5601
+#
+# ============================================================================
