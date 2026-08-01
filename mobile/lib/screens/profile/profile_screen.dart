@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../models/profile.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/profile_service.dart';
+import '../settings/preferences_screen.dart';
 import 'edit_profile_screen.dart';
 import 'follow_list_screen.dart';
 
@@ -86,11 +87,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
       appBar: AppBar(
         title: Text(_profile?.user.username ?? 'Profile'),
         actions: [
-          if (_isOwnProfile)
+          if (_isOwnProfile) ...[
+            IconButton(
+              icon: const Icon(Icons.tune),
+              tooltip: 'For You Preferences',
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const PreferencesScreen()),
+              ),
+            ),
             IconButton(
               icon: const Icon(Icons.logout),
               onPressed: () => context.read<AuthProvider>().logout(),
             ),
+          ],
         ],
       ),
       body: _isLoading
