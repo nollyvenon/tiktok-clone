@@ -21,9 +21,10 @@ dependencies:
   # Security (secure token storage - Keychain/Keystore backed)
   flutter_secure_storage: ^9.0.0
 
-  # Video & Media (Module 3: video feed playback)
+  # Video & Media (Module 3: video feed playback; Module 4: upload picker)
   video_player: ^2.7.0
   cached_network_image: ^3.3.0
+  image_picker: ^1.0.0
 
   # Navigation
   go_router: ^12.0.0
