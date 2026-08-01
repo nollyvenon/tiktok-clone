@@ -467,6 +467,7 @@ class DraftResponse(BaseModel):
     allow_duets: bool
     allow_stitches: bool
     status: str
+    scheduled_publish_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
 
@@ -539,6 +540,16 @@ class SegmentResponse(BaseModel):
     volume: int
     muted: bool
     created_at: datetime
+
+    @field_validator("effects", mode="before")
+    @classmethod
+    def parse_effects_json(cls, v):
+        """The `effects` column stores a JSON-encoded string; deserialize it here
+        rather than at every call site that builds a SegmentResponse."""
+        if isinstance(v, str):
+            import json
+            return json.loads(v)
+        return v
 
     class Config:
         from_attributes = True
@@ -618,6 +629,9 @@ class EditorStateResponse(BaseModel):
 class ExportResponse(BaseModel):
     """Export response"""
     export_id: UUID
+    draft_id: UUID
+    quality: str
+    format: str
     status: str
     progress: int
     preview_url: Optional[str] = None
@@ -931,6 +945,18 @@ class UserPreferenceResponse(BaseModel):
     content_diversity_score: float
     recency_preference: float
     updated_at: datetime
+
+    @field_validator(
+        "preferred_creators", "preferred_hashtags", "preferred_genres", "preferred_languages",
+        mode="before",
+    )
+    @classmethod
+    def parse_json_list(cls, v):
+        """These columns store JSON-encoded strings, not native lists"""
+        if isinstance(v, str):
+            import json
+            return json.loads(v)
+        return v
 
     class Config:
         from_attributes = True

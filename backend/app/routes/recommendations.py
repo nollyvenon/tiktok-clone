@@ -179,15 +179,7 @@ async def get_user_preferences(
 ):
     """Get user's recommendation preferences"""
     try:
-        prefs = await RecommendationService.get_user_preferences(db, current_user.id)
-        if not prefs:
-            # Return default preferences
-            return UserPreferenceResponse(
-                id=None,
-                content_diversity_score=0.5,
-                recency_preference=0.5,
-                updated_at=None,
-            )
+        prefs = await RecommendationService.get_or_create_user_preferences(db, current_user.id)
         return UserPreferenceResponse.from_orm(prefs)
     except Exception as e:
         logger.error(f"Get preferences error: {e}")

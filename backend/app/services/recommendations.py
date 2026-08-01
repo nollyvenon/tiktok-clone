@@ -281,6 +281,22 @@ class RecommendationService:
         return result.scalar()
 
     @staticmethod
+    async def get_or_create_user_preferences(
+        db: AsyncSession,
+        user_id: UUID,
+    ) -> UserPreference:
+        """Get user preferences, creating a default row on first access"""
+        prefs = await RecommendationService.get_user_preferences(db, user_id)
+        if prefs:
+            return prefs
+
+        prefs = UserPreference(user_id=user_id)
+        db.add(prefs)
+        await db.commit()
+        await db.refresh(prefs)
+        return prefs
+
+    @staticmethod
     async def update_user_preferences(
         db: AsyncSession,
         user_id: UUID,

@@ -22,11 +22,79 @@ from app.schemas import (
 from app.services.ai import AIService
 from app.services.uploads import UploadService
 from app.routes.auth import get_current_user
-from app.models import User, Segment
+from app.models import User, Segment, AIGeneration
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/ai", tags=["AI Creator Studio"])
+
+
+def _build_frame_response(auto_frame, generation_status: str) -> AutoFrameResponse:
+    """
+    Builds an AutoFrameResponse from an AutoFrame row.
+
+    The model stores the primary crop as flat crop_x/y/width/height columns
+    and alternatives as a JSON string, while the schema wants a nested
+    `suggested_crop: CropSuggestion` and `alternative_crops: list[CropSuggestion]`.
+    """
+    import json
+    from app.schemas import CropSuggestion
+
+    alt_crops_raw = json.loads(auto_frame.alternative_crops) if auto_frame.alternative_crops else []
+    return AutoFrameResponse(
+        id=auto_frame.id,
+        ai_generation_id=auto_frame.ai_generation_id,
+        target_aspect_ratio=auto_frame.target_aspect_ratio,
+        suggested_crop=CropSuggestion(
+            crop_x=auto_frame.crop_x,
+            crop_y=auto_frame.crop_y,
+            crop_width=auto_frame.crop_width,
+            crop_height=auto_frame.crop_height,
+            confidence=auto_frame.confidence,
+        ),
+        alternative_crops=[CropSuggestion(**c) for c in alt_crops_raw],
+        output_url=auto_frame.output_url,
+        preview_url=auto_frame.preview_url,
+        status=generation_status,
+        created_at=auto_frame.created_at,
+    )
+
+
+def _build_caption_response(caption, generation_status: str) -> AutoCaptionResponse:
+    """
+    Builds an AutoCaptionResponse from an AutoCaption row.
+
+    The model stores generated captions as a JSON string in `captions_data`
+    (there is no `captions` attribute), and the response schema's `captions`
+    field is a typed list - a plain from_orm()/model_validate() would either
+    KeyError or silently default to [] depending on pydantic version, hiding
+    real caption data.
+    """
+    import json
+
+    captions_data = json.loads(caption.captions_data) if caption.captions_data else []
+    return AutoCaptionResponse(
+        id=caption.id,
+        ai_generation_id=caption.ai_generation_id,
+        language=caption.language,
+        captions=captions_data,
+        vtt_url=caption.vtt_url,
+        status=generation_status,
+        created_at=caption.created_at,
+    )
+
+
+async def _get_generation_status(db: AsyncSession, ai_generation_id: UUID) -> str:
+    """
+    Look up the processing status for an AI sub-resource.
+
+    The BackgroundRemoval/Voiceover/AutoCaption/ColorCorrection/AutoFrame
+    tables don't carry their own status column - `status` lives on the
+    related AIGeneration row (ai_generation_id), so every response builder
+    needs this join rather than a plain from_orm() on the sub-resource.
+    """
+    ai_gen = await db.get(AIGeneration, ai_generation_id)
+    return ai_gen.status.value if ai_gen else "unknown"
 
 
 # ============================================================================
@@ -84,7 +152,16 @@ async def remove_background(
             db, current_user.id, request.segment_id, request
         )
 
-        return BackgroundRemovalResponse.from_orm(bg_removal)
+        return BackgroundRemovalResponse(
+            id=bg_removal.id,
+            ai_generation_id=bg_removal.ai_generation_id,
+            mode=bg_removal.mode,
+            blur_level=bg_removal.blur_level,
+            output_url=bg_removal.output_url,
+            preview_url=bg_removal.preview_url,
+            status=ai_gen.status.value,
+            created_at=bg_removal.created_at,
+        )
     except HTTPException:
         raise
     except Exception as e:
@@ -111,7 +188,16 @@ async def get_background_removal(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Background removal not found",
             )
-        return BackgroundRemovalResponse.from_orm(removal)
+        return BackgroundRemovalResponse(
+            id=removal.id,
+            ai_generation_id=removal.ai_generation_id,
+            mode=removal.mode,
+            blur_level=removal.blur_level,
+            output_url=removal.output_url,
+            preview_url=removal.preview_url,
+            status=await _get_generation_status(db, removal.ai_generation_id),
+            created_at=removal.created_at,
+        )
     except HTTPException:
         raise
     except Exception as e:
@@ -171,7 +257,17 @@ async def generate_voiceover(
             db, current_user.id, request.segment_id, request
         )
 
-        return VoiceoverResponse.from_orm(voiceover)
+        return VoiceoverResponse(
+            id=voiceover.id,
+            ai_generation_id=voiceover.ai_generation_id,
+            text=voiceover.text,
+            language=voiceover.language,
+            voice_id=voiceover.voice_id,
+            audio_url=voiceover.audio_url,
+            duration=voiceover.duration,
+            status=ai_gen.status.value,
+            created_at=voiceover.created_at,
+        )
     except HTTPException:
         raise
     except Exception as e:
@@ -198,7 +294,17 @@ async def get_voiceover(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Voiceover not found",
             )
-        return VoiceoverResponse.from_orm(voiceover)
+        return VoiceoverResponse(
+            id=voiceover.id,
+            ai_generation_id=voiceover.ai_generation_id,
+            text=voiceover.text,
+            language=voiceover.language,
+            voice_id=voiceover.voice_id,
+            audio_url=voiceover.audio_url,
+            duration=voiceover.duration,
+            status=await _get_generation_status(db, voiceover.ai_generation_id),
+            created_at=voiceover.created_at,
+        )
     except HTTPException:
         raise
     except Exception as e:
@@ -253,7 +359,7 @@ async def generate_captions(
             db, current_user.id, request.segment_id, request
         )
 
-        return AutoCaptionResponse.from_orm(caption)
+        return _build_caption_response(caption, ai_gen.status.value)
     except HTTPException:
         raise
     except Exception as e:
@@ -280,7 +386,9 @@ async def get_captions(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Captions not found",
             )
-        return AutoCaptionResponse.from_orm(caption)
+        return _build_caption_response(
+            caption, await _get_generation_status(db, caption.ai_generation_id)
+        )
     except HTTPException:
         raise
     except Exception as e:
@@ -407,7 +515,16 @@ async def apply_color_correction(
             db, current_user.id, request.segment_id, request
         )
 
-        return ColorCorrectionResponse.from_orm(color_correction)
+        return ColorCorrectionResponse(
+            id=color_correction.id,
+            ai_generation_id=color_correction.ai_generation_id,
+            method=color_correction.method,
+            preset_name=color_correction.preset_name,
+            output_url=color_correction.output_url,
+            preview_url=color_correction.preview_url,
+            status=ai_gen.status.value,
+            created_at=color_correction.created_at,
+        )
     except HTTPException:
         raise
     except Exception as e:
@@ -434,7 +551,16 @@ async def get_color_correction(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Color correction not found",
             )
-        return ColorCorrectionResponse.from_orm(correction)
+        return ColorCorrectionResponse(
+            id=correction.id,
+            ai_generation_id=correction.ai_generation_id,
+            method=correction.method,
+            preset_name=correction.preset_name,
+            output_url=correction.output_url,
+            preview_url=correction.preview_url,
+            status=await _get_generation_status(db, correction.ai_generation_id),
+            created_at=correction.created_at,
+        )
     except HTTPException:
         raise
     except Exception as e:
@@ -488,7 +614,7 @@ async def get_frame_suggestions(
             db, current_user.id, segment_id, target_aspect_ratio
         )
 
-        return AutoFrameResponse.from_orm(auto_frame)
+        return _build_frame_response(auto_frame, ai_gen.status.value)
     except HTTPException:
         raise
     except Exception as e:

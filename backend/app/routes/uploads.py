@@ -64,7 +64,7 @@ async def get_presigned_url(
         )
 
         # Get presigned URL
-        presigned_url = UploadService.get_presigned_url(upload.id, request.filename)
+        presigned_url = await UploadService.get_presigned_url(upload.id, request.filename)
 
         return UploadPresignedURLResponse(
             upload_id=upload.id,
@@ -141,6 +141,41 @@ async def complete_upload(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to complete upload",
         )
+
+
+@router.get(
+    "/drafts",
+    responses={
+        200: {"description": "User drafts"},
+        401: {"model": ErrorResponse, "description": "Unauthorized"},
+    },
+)
+async def get_user_drafts(
+    limit: int = Query(20, ge=1, le=50),
+    offset: int = Query(0, ge=0),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get current user's drafts"""
+    try:
+        drafts, total = await UploadService.get_user_drafts(
+            db,
+            current_user.id,
+            limit=limit,
+            offset=offset,
+        )
+
+        return {
+            "drafts": [DraftResponse.from_orm(d) for d in drafts],
+            "total": total,
+        }
+    except Exception as e:
+        logger.error(f"Get user drafts error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve drafts",
+        )
+
 
 
 @router.get(
@@ -332,39 +367,6 @@ async def delete_draft(
             detail="Failed to delete draft",
         )
 
-
-@router.get(
-    "/drafts",
-    responses={
-        200: {"description": "User drafts"},
-        401: {"model": ErrorResponse, "description": "Unauthorized"},
-    },
-)
-async def get_user_drafts(
-    limit: int = Query(20, ge=1, le=50),
-    offset: int = Query(0, ge=0),
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """Get current user's drafts"""
-    try:
-        drafts, total = await UploadService.get_user_drafts(
-            db,
-            current_user.id,
-            limit=limit,
-            offset=offset,
-        )
-
-        return {
-            "drafts": [DraftResponse.from_orm(d) for d in drafts],
-            "total": total,
-        }
-    except Exception as e:
-        logger.error(f"Get user drafts error: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to retrieve drafts",
-        )
 
 
 @router.post(

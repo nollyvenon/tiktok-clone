@@ -91,6 +91,8 @@ class EditorService:
         if not segment:
             raise ValueError("Segment not found")
 
+        segment.start_time = segment_data.start_time
+        segment.end_time = segment_data.end_time
         segment.content_type = segment_data.content_type
         segment.content_url = segment_data.content_url
         segment.effects = json.dumps(segment_data.effects) if segment_data.effects else None
@@ -289,15 +291,11 @@ class EditorService:
         if not segment:
             raise ValueError("Segment not found")
 
-        # Parse current effects
+        # Effects are stored as a flat list of effect-name strings (matching
+        # SegmentResponse.effects: list[str]); effect_params isn't persisted
+        # since there's no schema field for it yet.
         effects = json.loads(segment.effects) if segment.effects else []
-
-        # Add new effect
-        effects.append({
-            "name": effect_name,
-            "params": effect_params or {},
-        })
-
+        effects.append(effect_name)
         segment.effects = json.dumps(effects)
         await db.commit()
         await db.refresh(segment)
@@ -323,7 +321,7 @@ class EditorService:
         effects = json.loads(segment.effects) if segment.effects else []
 
         # Remove effect
-        effects = [e for e in effects if e.get("name") != effect_name]
+        effects = [e for e in effects if e != effect_name]
 
         segment.effects = json.dumps(effects) if effects else None
         await db.commit()
