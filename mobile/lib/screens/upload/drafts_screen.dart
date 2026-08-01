@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../models/draft.dart';
 import '../../services/upload_service.dart';
+import '../editor/editor_screen.dart';
 import 'upload_screen.dart';
 
 class DraftsScreen extends StatefulWidget {
@@ -132,6 +133,14 @@ class _DraftsScreenState extends State<DraftsScreen> {
                                 : Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
+                                      IconButton(
+                                        icon: const Icon(Icons.edit),
+                                        onPressed: () => Navigator.of(context).push(
+                                          MaterialPageRoute(
+                                            builder: (_) => EditorScreen(draftId: draft.id),
+                                          ),
+                                        ),
+                                      ),
                                       IconButton(
                                         icon: const Icon(Icons.schedule),
                                         onPressed: () => _schedule(draft.id),
