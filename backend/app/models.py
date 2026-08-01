@@ -439,3 +439,121 @@ class Draft(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     published_video_id = Column(UUID(as_uuid=True), nullable=True)  # Reference to published video
+
+    # Relationships
+    edits = relationship("Edit", back_populates="draft", cascade="all, delete-orphan")
+    segments = relationship("Segment", back_populates="draft", cascade="all, delete-orphan")
+
+
+class Edit(Base):
+    """Video editing operations and timeline"""
+    __tablename__ = "edits"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    draft_id = Column(UUID(as_uuid=True), ForeignKey("drafts.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    # Editing operations
+    operation_type = Column(String(50), nullable=False)  # trim, split, merge, crop, rotate, speed, reverse
+    start_time = Column(Integer, nullable=True)  # Milliseconds
+    end_time = Column(Integer, nullable=True)  # Milliseconds
+    duration = Column(Integer, nullable=True)  # Milliseconds
+
+    # Operation parameters (JSON for flexibility)
+    parameters = Column(String(2000), nullable=True)  # JSON string with operation params
+
+    # Status
+    order = Column(Integer, nullable=False)  # Order in timeline
+    applied = Column(Boolean, default=True, nullable=False)
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    # Relationships
+    draft = relationship("Draft", back_populates="edits")
+
+
+class Segment(Base):
+    """Video segments with effects and transitions"""
+    __tablename__ = "segments"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    draft_id = Column(UUID(as_uuid=True), ForeignKey("drafts.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    # Segment timing
+    start_time = Column(Integer, nullable=False)  # Milliseconds
+    end_time = Column(Integer, nullable=False)  # Milliseconds
+    order = Column(Integer, nullable=False)  # Order in timeline
+
+    # Content
+    content_type = Column(String(50), nullable=False)  # video, image, text, music, voiceover
+    content_url = Column(String(500), nullable=False)  # URL to content
+
+    # Effects (JSON array)
+    effects = Column(String(2000), nullable=True)  # JSON array of applied effects
+
+    # Transition (to next segment)
+    transition_type = Column(String(50), nullable=True)  # fade, slide, zoom, dissolve, etc.
+    transition_duration = Column(Integer, default=300, nullable=False)  # Milliseconds
+
+    # Volume
+    volume = Column(Integer, default=100, nullable=False)  # 0-100%
+    muted = Column(Boolean, default=False, nullable=False)
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    # Relationships
+    draft = relationship("Draft", back_populates="segments")
+
+
+class TextOverlay(Base):
+    """Text overlays on video"""
+    __tablename__ = "text_overlays"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    segment_id = Column(UUID(as_uuid=True), ForeignKey("segments.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    # Text content
+    text = Column(Text, nullable=False)
+    font_family = Column(String(100), default="Arial", nullable=False)
+    font_size = Column(Integer, default=24, nullable=False)
+    color = Column(String(7), default="#FFFFFF", nullable=False)  # Hex color
+
+    # Position & size
+    x = Column(Integer, nullable=False)  # Pixels
+    y = Column(Integer, nullable=False)  # Pixels
+    width = Column(Integer, nullable=False)  # Pixels
+    height = Column(Integer, nullable=False)  # Pixels
+
+    # Animation
+    animation_type = Column(String(50), nullable=True)  # fadeIn, slideIn, typewriter, etc.
+    animation_duration = Column(Integer, nullable=True)  # Milliseconds
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class Sticker(Base):
+    """Stickers applied to video"""
+    __tablename__ = "stickers"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    segment_id = Column(UUID(as_uuid=True), ForeignKey("segments.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    # Sticker info
+    sticker_url = Column(String(500), nullable=False)
+    sticker_type = Column(String(50), nullable=False)  # emoji, gif, effect, etc.
+
+    # Position & size
+    x = Column(Integer, nullable=False)  # Pixels
+    y = Column(Integer, nullable=False)  # Pixels
+    width = Column(Integer, nullable=False)  # Pixels
+    height = Column(Integer, nullable=False)  # Pixels
+    rotation = Column(Integer, default=0, nullable=False)  # Degrees
+
+    # Animation
+    animation_type = Column(String(50), nullable=True)
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)

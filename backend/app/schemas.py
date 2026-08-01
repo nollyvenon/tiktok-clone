@@ -122,6 +122,52 @@ class VerifyOTPRequest(BaseModel):
 
 
 # ============================================================================
+# User Schemas (Base Classes)
+# ============================================================================
+
+class UserBase(BaseModel):
+    """Base user information"""
+    email: str
+    username: str
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    bio: Optional[str] = None
+    avatar_url: Optional[str] = None
+    cover_url: Optional[str] = None
+    website: Optional[str] = None
+    is_creator: bool = False
+
+    class Config:
+        from_attributes = True
+
+
+class UserResponse(UserBase):
+    """User response (public-facing)"""
+    id: UUID
+    is_verified: bool
+    role: UserRole
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class UserDetailedResponse(UserBase):
+    """Detailed user response (private profile)"""
+    id: UUID
+    is_verified: bool
+    is_active: bool
+    role: UserRole
+    two_factor_enabled: bool
+    created_at: datetime
+    updated_at: datetime
+    last_login: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+# ============================================================================
 # Profile Schemas
 # ============================================================================
 
@@ -434,59 +480,130 @@ class UploadPresignedURLResponse(BaseModel):
 
 
 # ============================================================================
-# User Schemas
+# Editor Schemas
 # ============================================================================
 
-class UserBase(BaseModel):
-    """Base user information"""
-    email: str
-    username: str
-    first_name: Optional[str] = None
-    last_name: Optional[str] = None
-    bio: Optional[str] = None
-    avatar_url: Optional[str] = None
-    cover_url: Optional[str] = None
-    website: Optional[str] = None
-    is_creator: bool = False
-
-    class Config:
-        from_attributes = True
+class EditOperation(BaseModel):
+    """Video edit operation"""
+    operation_type: str = Field(..., description="trim, split, merge, crop, rotate, speed, reverse")
+    start_time: Optional[int] = None
+    end_time: Optional[int] = None
+    parameters: Optional[dict] = None
 
 
-class UserResponse(UserBase):
-    """User response (public-facing)"""
+class SegmentCreate(BaseModel):
+    """Create video segment"""
+    start_time: int = Field(..., ge=0, description="Start time in ms")
+    end_time: int = Field(..., ge=0, description="End time in ms")
+    content_type: str = Field(..., description="video, image, text, music, voiceover")
+    content_url: str
+    effects: Optional[list[str]] = None
+    transition_type: Optional[str] = None
+    transition_duration: int = 300
+    volume: int = Field(100, ge=0, le=100)
+    muted: bool = False
+
+
+class SegmentResponse(BaseModel):
+    """Segment response"""
     id: UUID
-    is_verified: bool
-    role: UserRole
+    start_time: int
+    end_time: int
+    order: int
+    content_type: str
+    content_url: str
+    effects: Optional[list[str]] = None
+    transition_type: Optional[str] = None
+    transition_duration: int
+    volume: int
+    muted: bool
     created_at: datetime
 
     class Config:
         from_attributes = True
 
 
-class UserProfileUpdate(BaseModel):
-    """Update user profile"""
-    first_name: Optional[str] = Field(None, max_length=100)
-    last_name: Optional[str] = Field(None, max_length=100)
-    bio: Optional[str] = Field(None, max_length=150)
-    avatar_url: Optional[str] = None
-    cover_url: Optional[str] = None
-    website: Optional[str] = None
+class TextOverlayCreate(BaseModel):
+    """Create text overlay"""
+    text: str = Field(..., max_length=500)
+    font_family: str = "Arial"
+    font_size: int = Field(24, ge=8, le=120)
+    color: str = "#FFFFFF"
+    x: int
+    y: int
+    width: int
+    height: int
+    animation_type: Optional[str] = None
+    animation_duration: Optional[int] = None
 
 
-class UserDetailedResponse(UserBase):
-    """Detailed user response (private profile)"""
+class TextOverlayResponse(BaseModel):
+    """Text overlay response"""
     id: UUID
-    is_verified: bool
-    is_active: bool
-    role: UserRole
-    two_factor_enabled: bool
+    text: str
+    font_family: str
+    font_size: int
+    color: str
+    x: int
+    y: int
+    width: int
+    height: int
+    animation_type: Optional[str] = None
+    animation_duration: Optional[int] = None
     created_at: datetime
-    updated_at: datetime
-    last_login: Optional[datetime] = None
 
     class Config:
         from_attributes = True
+
+
+class StickerCreate(BaseModel):
+    """Create sticker"""
+    sticker_url: str
+    sticker_type: str
+    x: int
+    y: int
+    width: int
+    height: int
+    rotation: int = 0
+    animation_type: Optional[str] = None
+
+
+class StickerResponse(BaseModel):
+    """Sticker response"""
+    id: UUID
+    sticker_url: str
+    sticker_type: str
+    x: int
+    y: int
+    width: int
+    height: int
+    rotation: int
+    animation_type: Optional[str] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class EditorStateResponse(BaseModel):
+    """Complete editor state"""
+    draft_id: UUID
+    segments: list[SegmentResponse]
+    text_overlays: list[TextOverlayResponse]
+    stickers: list[StickerResponse]
+    total_duration: int  # Milliseconds
+
+
+class ExportResponse(BaseModel):
+    """Export response"""
+    export_id: UUID
+    status: str
+    progress: int
+    preview_url: Optional[str] = None
+    export_url: Optional[str] = None
+    created_at: datetime
+
+
 
 
 # ============================================================================
