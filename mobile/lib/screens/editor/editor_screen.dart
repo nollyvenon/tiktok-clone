@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../models/editor_state.dart';
+import '../../services/ai_service.dart';
 import '../../services/editor_service.dart';
 
 const _effects = ['blur', 'brighten', 'saturate', 'desaturate', 'vintage', 'cinematic'];
@@ -16,11 +17,13 @@ class EditorScreen extends StatefulWidget {
 
 class _EditorScreenState extends State<EditorScreen> {
   final _editorService = EditorService();
+  final _aiService = AIService();
   EditorStateData? _state;
   bool _isLoading = true;
   String? _error;
   String? _busySegmentId;
   String? _exportStatus;
+  final Map<String, String> _aiStatus = {};
 
   @override
   void initState() {
@@ -91,6 +94,46 @@ class _EditorScreenState extends State<EditorScreen> {
       await _load();
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+    }
+  }
+
+  Future<void> _removeBackground(EditorSegment segment) async {
+    setState(() => _aiStatus[segment.id] = 'Removing background... (10 credits)');
+    try {
+      await _aiService.removeBackground(segment.id);
+      setState(() => _aiStatus[segment.id] = 'Background removal queued');
+    } catch (e) {
+      setState(() => _aiStatus[segment.id] = e.toString());
+    }
+  }
+
+  Future<void> _generateCaptions(EditorSegment segment) async {
+    setState(() => _aiStatus[segment.id] = 'Generating captions... (5 credits)');
+    try {
+      await _aiService.generateCaptions(segment.id);
+      setState(() => _aiStatus[segment.id] = 'Captions queued');
+    } catch (e) {
+      setState(() => _aiStatus[segment.id] = e.toString());
+    }
+  }
+
+  Future<void> _colorCorrect(EditorSegment segment) async {
+    setState(() => _aiStatus[segment.id] = 'Applying auto color correction...');
+    try {
+      await _aiService.applyColorCorrection(segment.id);
+      setState(() => _aiStatus[segment.id] = 'Color correction queued');
+    } catch (e) {
+      setState(() => _aiStatus[segment.id] = e.toString());
+    }
+  }
+
+  Future<void> _smartFrame(EditorSegment segment) async {
+    setState(() => _aiStatus[segment.id] = 'Getting frame suggestions...');
+    try {
+      await _aiService.getFrameSuggestions(segment.id);
+      setState(() => _aiStatus[segment.id] = 'Smart framing queued');
+    } catch (e) {
+      setState(() => _aiStatus[segment.id] = e.toString());
     }
   }
 
@@ -192,6 +235,44 @@ class _EditorScreenState extends State<EditorScreen> {
                                 '${segment.startTime}ms - ${segment.endTime}ms',
                                 style: Theme.of(context).textTheme.bodySmall,
                               ),
+                              const Divider(),
+                              const Row(
+                                children: [
+                                  Icon(Icons.auto_awesome, size: 14, color: Colors.purple),
+                                  SizedBox(width: 4),
+                                  Text('AI tools', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Wrap(
+                                spacing: 8,
+                                children: [
+                                  ActionChip(
+                                    label: const Text('Remove background'),
+                                    onPressed: () => _removeBackground(segment),
+                                  ),
+                                  ActionChip(
+                                    label: const Text('Auto captions'),
+                                    onPressed: () => _generateCaptions(segment),
+                                  ),
+                                  ActionChip(
+                                    label: const Text('Auto color'),
+                                    onPressed: () => _colorCorrect(segment),
+                                  ),
+                                  ActionChip(
+                                    label: const Text('Smart frame'),
+                                    onPressed: () => _smartFrame(segment),
+                                  ),
+                                ],
+                              ),
+                              if (_aiStatus[segment.id] != null)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 4),
+                                  child: Text(
+                                    _aiStatus[segment.id]!,
+                                    style: Theme.of(context).textTheme.bodySmall,
+                                  ),
+                                ),
                             ],
                           ),
                         ),
