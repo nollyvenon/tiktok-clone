@@ -875,6 +875,81 @@ class SessionInfo(BaseModel):
 
 
 # ============================================================================
+# Recommendation Engine Schemas
+# ============================================================================
+
+class RecommendationResponse(BaseModel):
+    """Recommendation response"""
+    id: UUID
+    video_id: UUID
+    score: float
+    algorithm: str
+    reason: Optional[str] = None
+    video: VideoDetailResponse
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class RecommendationsListResponse(BaseModel):
+    """List of recommendations"""
+    recommendations: List[RecommendationResponse]
+    cursor: Optional[str] = None
+    total: int
+
+
+class UserPreferenceResponse(BaseModel):
+    """User preference response"""
+    id: UUID
+    preferred_creators: Optional[List[str]] = []
+    preferred_hashtags: Optional[List[str]] = []
+    preferred_genres: Optional[List[str]] = []
+    preferred_languages: Optional[List[str]] = []
+    avg_watch_time: Optional[int] = None
+    content_diversity_score: float
+    recency_preference: float
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class UserPreferenceUpdate(BaseModel):
+    """Update user preferences"""
+    preferred_creators: Optional[List[UUID]] = None
+    preferred_hashtags: Optional[List[str]] = None
+    preferred_genres: Optional[List[str]] = None
+    preferred_languages: Optional[List[str]] = None
+    content_diversity_score: Optional[float] = Field(None, ge=0, le=1)
+    recency_preference: Optional[float] = Field(None, ge=0, le=1)
+
+
+class RecommendationFeedbackRequest(BaseModel):
+    """Feedback on recommendation"""
+    feedback_type: str = Field(..., description="relevant, irrelevant, duplicate, nsfw, not_interested")
+    rating: Optional[int] = Field(None, ge=1, le=5)
+    reason: Optional[str] = None
+
+
+class ABTestResponse(BaseModel):
+    """A/B test response"""
+    id: UUID
+    name: str
+    description: Optional[str] = None
+    control_version: str
+    treatment_version: str
+    split_percentage: int
+    is_active: bool
+    results_significant: Optional[bool] = None
+    started_at: datetime
+    ended_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+# ============================================================================
 # Error Schemas
 # ============================================================================
 

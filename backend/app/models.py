@@ -2,7 +2,7 @@
 Database models for the TikTok Clone application
 """
 
-from sqlalchemy import Column, String, Boolean, DateTime, Text, Integer, ForeignKey, Enum, UniqueConstraint
+from sqlalchemy import Column, String, Boolean, DateTime, Text, Integer, ForeignKey, Enum, UniqueConstraint, Float
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
 from datetime import datetime, timedelta
@@ -818,3 +818,112 @@ class TrendSuggestion(Base):
     # Relationships
     user = relationship("User", backref="trend_suggestions")
     draft = relationship("Draft", backref="trend_suggestions")
+
+
+class Recommendation(Base):
+    """Recommendation records for personalized feed"""
+    __tablename__ = "recommendations"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    video_id = Column(UUID(as_uuid=True), ForeignKey("videos.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    # Recommendation metadata
+    score = Column(Float, nullable=False)  # 0-1 recommendation score
+    algorithm = Column(String(50), nullable=False)  # collaborative, content_based, trending, etc.
+    reason = Column(String(255), nullable=True)  # Why recommended (tags, creator, similar_to, etc.)
+
+    # Feedback tracking
+    shown = Column(Boolean, default=False, nullable=False)
+    clicked = Column(Boolean, default=False, nullable=False)
+    watched = Column(Boolean, default=False, nullable=False)
+    liked = Column(Boolean, default=False, nullable=False)
+
+    # Timestamps
+    computed_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    shown_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    # Relationships
+    user = relationship("User", backref="recommendations")
+    video = relationship("Video", backref="recommendations")
+
+
+class UserPreference(Base):
+    """User viewing and engagement history for recommendations"""
+    __tablename__ = "user_preferences"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    # Preference data (JSON for flexibility)
+    preferred_creators = Column(String(2000), nullable=True)  # JSON array of creator IDs
+    preferred_hashtags = Column(String(2000), nullable=True)  # JSON array of hashtags
+    preferred_genres = Column(String(500), nullable=True)  # JSON array of genres
+    preferred_languages = Column(String(500), nullable=True)  # JSON array of language codes
+
+    # Engagement metrics
+    avg_watch_time = Column(Integer, nullable=True)  # Average watch time in seconds
+    content_diversity_score = Column(Float, default=0.5, nullable=False)  # 0-1 preference for diversity
+    recency_preference = Column(Float, default=0.5, nullable=False)  # 0-1 preference for recent content
+
+    # Model version
+    model_version = Column(String(50), nullable=False, default="v1")
+
+    # Timestamps
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    # Relationships
+    user = relationship("User", backref="preferences")
+
+
+class RecommendationFeedback(Base):
+    """Feedback on recommendation quality for model improvement"""
+    __tablename__ = "recommendation_feedback"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    recommendation_id = Column(UUID(as_uuid=True), ForeignKey("recommendations.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+
+    # Feedback
+    feedback_type = Column(String(50), nullable=False)  # relevant, irrelevant, duplicate, nsfw, not_interested
+    rating = Column(Integer, nullable=True)  # 1-5 star rating if applicable
+
+    # Explanation
+    reason = Column(String(255), nullable=True)
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    # Relationships
+    recommendation = relationship("Recommendation", backref="feedback")
+    user = relationship("User", backref="recommendation_feedback")
+
+
+class ABTest(Base):
+    """A/B test configuration for recommendation algorithm testing"""
+    __tablename__ = "ab_tests"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+
+    # Test configuration
+    name = Column(String(255), unique=True, nullable=False)
+    description = Column(Text, nullable=True)
+    test_type = Column(String(50), nullable=False)  # algorithm, weights, ranking, etc.
+
+    # Variants
+    control_version = Column(String(50), nullable=False)  # Control algorithm version
+    treatment_version = Column(String(50), nullable=False)  # Treatment algorithm version
+
+    # Test parameters
+    split_percentage = Column(Integer, default=50, nullable=False)  # Percentage of users in treatment
+
+    # Status
+    is_active = Column(Boolean, default=True, nullable=False)
+    results_significant = Column(Boolean, nullable=True)  # Is result statistically significant?
+
+    # Timestamps
+    started_at = Column(DateTime, nullable=False)
+    ended_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
