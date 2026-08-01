@@ -355,6 +355,85 @@ class VideoAnalytics(BaseModel):
 
 
 # ============================================================================
+# Upload & Draft Schemas
+# ============================================================================
+
+class UploadResponse(BaseModel):
+    """Upload response"""
+    id: UUID
+    status: str
+    progress: int
+    file_size: int
+    duration: Optional[int] = None
+    thumbnail_url: Optional[str] = None
+    processed_video_url: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class DraftCreate(BaseModel):
+    """Create/update draft"""
+    title: Optional[str] = Field(None, max_length=255)
+    description: Optional[str] = Field(None, max_length=2200)
+    hashtags: Optional[str] = None
+    thumbnail_url: Optional[str] = None
+    is_public: bool = True
+    allow_comments: bool = True
+    allow_duets: bool = True
+    allow_stitches: bool = True
+    scheduled_publish_at: Optional[datetime] = None
+
+
+class DraftResponse(BaseModel):
+    """Draft response"""
+    id: UUID
+    upload_id: Optional[UUID] = None
+    title: Optional[str] = None
+    description: Optional[str] = None
+    hashtags: Optional[str] = None
+    thumbnail_url: Optional[str] = None
+    is_public: bool
+    allow_comments: bool
+    allow_duets: bool
+    allow_stitches: bool
+    status: str
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class PublishDraftRequest(BaseModel):
+    """Publish draft request"""
+    draft_id: UUID
+    title: str = Field(..., max_length=255)
+    description: Optional[str] = Field(None, max_length=2200)
+    hashtags: Optional[str] = None
+    is_public: bool = True
+    allow_comments: bool = True
+    allow_duets: bool = True
+    allow_stitches: bool = True
+
+
+class UploadPresignedURLRequest(BaseModel):
+    """Request presigned URL for upload"""
+    filename: str
+    file_size: int
+    mime_type: str
+
+
+class UploadPresignedURLResponse(BaseModel):
+    """Presigned URL response"""
+    upload_id: UUID
+    presigned_url: str
+    expires_in: int  # Seconds
+
+
+# ============================================================================
 # User Schemas
 # ============================================================================
 

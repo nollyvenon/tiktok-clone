@@ -365,3 +365,77 @@ class View(Base):
     __table_args__ = (
         UniqueConstraint('user_id', 'video_id', 'created_at', name='unique_user_video_view_day'),
     )
+
+
+class UploadStatus(str, enum.Enum):
+    """Upload status"""
+    UPLOADING = "uploading"
+    PROCESSING = "processing"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
+class Upload(Base):
+    """Video uploads in progress"""
+    __tablename__ = "uploads"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    # Upload info
+    original_filename = Column(String(500), nullable=False)
+    file_size = Column(Integer, nullable=False)  # Bytes
+    mime_type = Column(String(100), nullable=False)  # video/mp4, etc.
+    storage_path = Column(String(500), nullable=False)  # S3 or local path
+
+    # Processing
+    status = Column(Enum(UploadStatus), default=UploadStatus.UPLOADING, nullable=False, index=True)
+    progress = Column(Integer, default=0, nullable=False)  # 0-100%
+    error_message = Column(Text, nullable=True)
+
+    # Processing results
+    processed_video_url = Column(String(500), nullable=True)
+    thumbnail_url = Column(String(500), nullable=True)
+    duration = Column(Integer, nullable=True)  # Seconds
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    completed_at = Column(DateTime, nullable=True)
+
+
+class DraftStatus(str, enum.Enum):
+    """Draft status"""
+    EDITING = "editing"
+    READY_TO_PUBLISH = "ready_to_publish"
+    PUBLISHED = "published"
+
+
+class Draft(Base):
+    """Video drafts for creators"""
+    __tablename__ = "drafts"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    upload_id = Column(UUID(as_uuid=True), ForeignKey("uploads.id", ondelete="SET NULL"), nullable=True)
+
+    # Draft content
+    title = Column(String(255), nullable=True)
+    description = Column(Text, nullable=True)
+    hashtags = Column(String(500), nullable=True)
+    thumbnail_url = Column(String(500), nullable=True)
+
+    # Settings
+    is_public = Column(Boolean, default=True, nullable=False)
+    allow_comments = Column(Boolean, default=True, nullable=False)
+    allow_duets = Column(Boolean, default=True, nullable=False)
+    allow_stitches = Column(Boolean, default=True, nullable=False)
+
+    # Status
+    status = Column(Enum(DraftStatus), default=DraftStatus.EDITING, nullable=False, index=True)
+    scheduled_publish_at = Column(DateTime, nullable=True)
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    published_video_id = Column(UUID(as_uuid=True), nullable=True)  # Reference to published video
