@@ -927,3 +927,159 @@ class ABTest(Base):
     started_at = Column(DateTime, nullable=False)
     ended_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+# ============================================================================
+# MODULE 9: HASHTAG TRENDING SYSTEM
+# ============================================================================
+
+class HashtagTrend(Base):
+    """Trending hashtag tracking"""
+    __tablename__ = "hashtag_trends"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    hashtag = Column(String(100), nullable=False, index=True)
+
+    # Metrics
+    usage_count = Column(Integer, default=0, nullable=False)
+    unique_creators = Column(Integer, default=0, nullable=False)
+    total_views = Column(Integer, default=0, nullable=False)
+    total_likes = Column(Integer, default=0, nullable=False)
+
+    # Ranking
+    popularity_score = Column(Float, default=0.0, nullable=False)  # 0-100
+    trend_velocity = Column(Float, default=0.0, nullable=False)  # Growth rate
+    rank_position = Column(Integer, nullable=True)  # Daily/weekly rank
+
+    # Metadata
+    region = Column(String(50), nullable=False, index=True)  # US, UK, Global, etc
+    category = Column(String(50), nullable=True)  # music, dance, comedy, etc
+    is_challenge = Column(Boolean, default=False, nullable=False)
+    challenge_rules = Column(Text, nullable=True)
+
+    # Lifecycle
+    peak_date = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+
+class HashtagAnalytics(Base):
+    """Hashtag usage analytics"""
+    __tablename__ = "hashtag_analytics"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    hashtag = Column(String(100), nullable=False, index=True)
+
+    # Daily metrics
+    date = Column(DateTime, nullable=False, index=True)
+    usage_count = Column(Integer, default=0, nullable=False)
+    unique_creators = Column(Integer, default=0, nullable=False)
+    total_views = Column(Integer, default=0, nullable=False)
+    total_engagement = Column(Integer, default=0, nullable=False)
+
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class Challenge(Base):
+    """Hashtag challenges"""
+    __tablename__ = "challenges"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    hashtag = Column(String(100), nullable=False, unique=True)
+
+    # Challenge details
+    title = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+    rules = Column(Text, nullable=True)
+    prize_pool = Column(Integer, nullable=True)  # In cents
+
+    # Images/video
+    thumbnail_url = Column(String(500), nullable=True)
+    demo_video_url = Column(String(500), nullable=True)
+
+    # Dates
+    start_date = Column(DateTime, nullable=False)
+    end_date = Column(DateTime, nullable=False)
+
+    # Status
+    is_active = Column(Boolean, default=True, nullable=False)
+    participation_count = Column(Integer, default=0, nullable=False)
+    total_views = Column(Integer, default=0, nullable=False)
+
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+
+# ============================================================================
+# MODULE 10: NOTIFICATIONS SYSTEM
+# ============================================================================
+
+class NotificationType(str, enum.Enum):
+    """Notification types"""
+    FOLLOW = "follow"
+    LIKE = "like"
+    COMMENT = "comment"
+    MENTION = "mention"
+    SHARE = "share"
+    REPLY = "reply"
+    MESSAGE = "message"
+    LIVE_START = "live_start"
+    CREATOR_UPDATE = "creator_update"
+    GIFT = "gift"
+    DUET_STITCH = "duet_stitch"
+
+
+class Notification(Base):
+    """User notifications"""
+    __tablename__ = "notifications"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    # Notification details
+    type = Column(Enum(NotificationType), nullable=False)
+    actor_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=True)  # Who triggered it
+    related_video_id = Column(UUID(as_uuid=True), ForeignKey("videos.id", ondelete="CASCADE"), nullable=True)
+    related_comment_id = Column(UUID(as_uuid=True), nullable=True)  # For comment notifications
+
+    # Content
+    title = Column(String(255), nullable=False)
+    message = Column(Text, nullable=True)
+
+    # Status
+    is_read = Column(Boolean, default=False, nullable=False)
+    read_at = Column(DateTime, nullable=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+
+
+class NotificationPreference(Base):
+    """User notification preferences"""
+    __tablename__ = "notification_preferences"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True)
+
+    # Channel preferences
+    push_enabled = Column(Boolean, default=True, nullable=False)
+    email_enabled = Column(Boolean, default=True, nullable=False)
+    in_app_enabled = Column(Boolean, default=True, nullable=False)
+
+    # Type preferences
+    follow_notifications = Column(Boolean, default=True, nullable=False)
+    like_notifications = Column(Boolean, default=True, nullable=False)
+    comment_notifications = Column(Boolean, default=True, nullable=False)
+    mention_notifications = Column(Boolean, default=True, nullable=False)
+    message_notifications = Column(Boolean, default=True, nullable=False)
+
+    # Email digest
+    email_digest_enabled = Column(Boolean, default=True, nullable=False)
+    email_digest_frequency = Column(String(50), default="daily")  # daily, weekly, never
+
+    # Quiet hours
+    quiet_hours_start = Column(String(5), nullable=True)  # HH:MM format
+    quiet_hours_end = Column(String(5), nullable=True)
+    quiet_hours_enabled = Column(Boolean, default=False, nullable=False)
+
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
