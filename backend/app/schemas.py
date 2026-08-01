@@ -950,6 +950,166 @@ class ABTestResponse(BaseModel):
 
 
 # ============================================================================
+# Hashtag Trending Schemas (Module 9)
+# ============================================================================
+
+class HashtagTrendResponse(BaseModel):
+    """Hashtag trend response"""
+    id: UUID
+    hashtag: str
+    region: str
+    usage_count: int
+    unique_creators: int
+    total_views: int
+    total_likes: int
+    popularity_score: int
+    trend_velocity: float
+    rank_position: Optional[int] = None
+    category: Optional[str] = None
+    is_challenge: bool
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class HashtagAnalyticsResponse(BaseModel):
+    """Hashtag analytics response"""
+    id: UUID
+    hashtag: str
+    date: datetime
+    usage_count: int
+    unique_creators: int
+    total_views: int
+    total_likes: int
+
+    class Config:
+        from_attributes = True
+
+
+class ChallengeResponse(BaseModel):
+    """Hashtag challenge response"""
+    id: UUID
+    hashtag: str
+    title: str
+    description: Optional[str] = None
+    rules: Optional[str] = None
+    thumbnail_url: Optional[str] = None
+    demo_video_url: Optional[str] = None
+    start_date: datetime
+    end_date: datetime
+    prize_pool: Optional[int] = None
+    participation_count: int
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class ChallengeCreateRequest(BaseModel):
+    """Create challenge request"""
+    hashtag: str
+    title: str
+    description: Optional[str] = None
+    rules: Optional[str] = None
+    thumbnail_url: Optional[str] = None
+    demo_video_url: Optional[str] = None
+    start_date: datetime
+    end_date: datetime
+    prize_pool: Optional[int] = None
+
+
+# ============================================================================
+# Notification Schemas (Module 10)
+# ============================================================================
+
+class NotificationTypeEnum(str):
+    """Notification types"""
+    FOLLOW = "follow"
+    LIKE = "like"
+    COMMENT = "comment"
+    MENTION = "mention"
+    SHARE = "share"
+    REPLY = "reply"
+    MESSAGE = "message"
+    LIVE_START = "live_start"
+    CREATOR_UPDATE = "creator_update"
+    GIFT = "gift"
+    DUET_STITCH = "duet_stitch"
+
+
+class NotificationResponse(BaseModel):
+    """Notification response"""
+    id: UUID
+    user_id: UUID
+    type: str
+    actor_id: Optional[UUID] = None
+    related_video_id: Optional[UUID] = None
+    title: str
+    body: str
+    data: Optional[dict] = None
+    is_read: bool
+    read_at: Optional[datetime] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class NotificationPreferenceResponse(BaseModel):
+    """Notification preferences response"""
+    id: UUID
+    user_id: UUID
+    push_enabled: bool
+    email_enabled: bool
+    in_app_enabled: bool
+    digest_frequency: str = "daily"
+    quiet_hours_start: Optional[str] = None
+    quiet_hours_end: Optional[str] = None
+    follow_notifications: bool = True
+    like_notifications: bool = True
+    comment_notifications: bool = True
+    mention_notifications: bool = True
+    message_notifications: bool = True
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class NotificationPreferenceUpdate(BaseModel):
+    """Update notification preferences"""
+    push_enabled: Optional[bool] = None
+    email_enabled: Optional[bool] = None
+    in_app_enabled: Optional[bool] = None
+    digest_frequency: Optional[str] = None
+    quiet_hours_start: Optional[str] = None
+    quiet_hours_end: Optional[str] = None
+    follow_notifications: Optional[bool] = None
+    like_notifications: Optional[bool] = None
+    comment_notifications: Optional[bool] = None
+    mention_notifications: Optional[bool] = None
+    message_notifications: Optional[bool] = None
+
+
+class MarkNotificationReadRequest(BaseModel):
+    """Mark notification as read"""
+    is_read: bool = True
+
+
+class NotificationListResponse(BaseModel):
+    """Notification list response"""
+    notifications: List[NotificationResponse]
+    total: int
+    unread_count: int
+    limit: int
+    offset: int
+
+
+# ============================================================================
 # Error Schemas
 # ============================================================================
 
