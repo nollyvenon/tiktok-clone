@@ -3,7 +3,7 @@ Pydantic schemas for request/response validation
 """
 
 from pydantic import BaseModel, EmailStr, Field, field_validator, ConfigDict
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
 from uuid import UUID
 
@@ -359,7 +359,7 @@ class VideoDetailResponse(VideoResponse):
 class FeedResponse(BaseModel):
     """Video feed response"""
     videos: list[VideoDetailResponse]
-    cursor: Optional[str] = None  # For pagination
+    cursor: Optional[str] = None
     total: Optional[int] = None
 
 
@@ -377,7 +377,7 @@ class BookmarkResponse(BaseModel):
 
 class ViewTrackingRequest(BaseModel):
     """Track video view request"""
-    watch_time: int = Field(..., ge=0)  # Seconds watched
+    watch_time: int = Field(..., ge=0)
     completed: bool = False
     device_type: Optional[str] = None
     platform: Optional[str] = None
@@ -476,7 +476,7 @@ class UploadPresignedURLResponse(BaseModel):
     """Presigned URL response"""
     upload_id: UUID
     presigned_url: str
-    expires_in: int  # Seconds
+    expires_in: int
 
 
 # ============================================================================
@@ -591,7 +591,7 @@ class EditorStateResponse(BaseModel):
     segments: list[SegmentResponse]
     text_overlays: list[TextOverlayResponse]
     stickers: list[StickerResponse]
-    total_duration: int  # Milliseconds
+    total_duration: int
 
 
 class ExportResponse(BaseModel):
@@ -604,6 +604,256 @@ class ExportResponse(BaseModel):
     created_at: datetime
 
 
+# ============================================================================
+# AI Creator Studio Schemas
+# ============================================================================
+
+class AIGenerationResponse(BaseModel):
+    """AI generation operation response"""
+    id: UUID
+    operation_type: str
+    status: str
+    credits_used: int
+    output_data: Optional[dict] = None
+    error_message: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class BackgroundRemovalRequest(BaseModel):
+    """Background removal request"""
+    segment_id: UUID
+    mode: str = Field(..., description="blur, remove, replace, green_screen")
+    blur_level: int = Field(5, ge=0, le=10)
+    background_url: Optional[str] = None
+    background_type: Optional[str] = Field(None, description="image, video, color, blur")
+
+
+class BackgroundRemovalResponse(BaseModel):
+    """Background removal response"""
+    id: UUID
+    ai_generation_id: UUID
+    mode: str
+    blur_level: int
+    output_url: Optional[str] = None
+    preview_url: Optional[str] = None
+    status: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class VoiceoverRequest(BaseModel):
+    """Voiceover generation request"""
+    segment_id: UUID
+    text: str = Field(..., max_length=2000)
+    language: str = Field("en", description="en, es, fr, de, ja, zh, etc.")
+    voice_id: str
+    gender: Optional[str] = Field(None, description="male, female, neutral")
+    emotion: Optional[str] = Field(None, description="happy, sad, angry, neutral")
+    speed: int = Field(100, ge=50, le=200)
+    pitch: int = Field(100, ge=50, le=200)
+    volume: int = Field(100, ge=0, le=100)
+
+
+class VoiceoverResponse(BaseModel):
+    """Voiceover response"""
+    id: UUID
+    ai_generation_id: UUID
+    text: str
+    language: str
+    voice_id: str
+    audio_url: Optional[str] = None
+    duration: Optional[int] = None
+    status: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class AutoCaptionRequest(BaseModel):
+    """Auto-caption generation request"""
+    segment_id: UUID
+    language: str = Field("en", description="en, es, fr, de, ja, zh, etc.")
+    style: str = Field("default", description="default, bold, shadow, background")
+    font_family: str = "Arial"
+    font_size: int = Field(24, ge=12, le=48)
+    color: str = "#FFFFFF"
+    background_color: Optional[str] = None
+    position: str = Field("bottom", description="top, middle, bottom")
+
+
+class CaptionSegment(BaseModel):
+    """Individual caption segment"""
+    start_time: int
+    end_time: int
+    text: str
+
+
+class AutoCaptionResponse(BaseModel):
+    """Auto-caption response"""
+    id: UUID
+    ai_generation_id: UUID
+    language: str
+    captions: list[CaptionSegment] = []
+    vtt_url: Optional[str] = None
+    status: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class SoundRecommendationResponse(BaseModel):
+    """Sound recommendation response"""
+    id: UUID
+    sound_url: str
+    sound_title: str
+    artist: Optional[str] = None
+    category: str
+    mood: Optional[str] = None
+    genre: Optional[str] = None
+    duration: Optional[int] = None
+    is_trending: bool
+    license_type: str
+    credit_required: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class SoundRecommendationsListResponse(BaseModel):
+    """List of sound recommendations"""
+    sounds: list[SoundRecommendationResponse]
+    total: int
+    category: str
+    region: str
+
+
+class ColorCorrectionPreset(BaseModel):
+    """Color correction preset"""
+    preset_name: str
+    description: Optional[str] = None
+    brightness: int
+    contrast: int
+    saturation: int
+    hue: int
+    temperature: int
+
+
+class ColorCorrectionRequest(BaseModel):
+    """Color correction request"""
+    segment_id: UUID
+    method: str = Field("auto_enhance", description="preset, auto_enhance, lut, custom")
+    preset_name: Optional[str] = None
+    brightness: int = Field(0, ge=-100, le=100)
+    contrast: int = Field(0, ge=-100, le=100)
+    saturation: int = Field(0, ge=-100, le=100)
+    hue: int = Field(0, ge=-180, le=180)
+    temperature: int = Field(0, ge=-100, le=100)
+
+
+class ColorCorrectionResponse(BaseModel):
+    """Color correction response"""
+    id: UUID
+    ai_generation_id: UUID
+    method: str
+    preset_name: Optional[str] = None
+    output_url: Optional[str] = None
+    preview_url: Optional[str] = None
+    status: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class CropSuggestion(BaseModel):
+    """Crop suggestion for framing"""
+    crop_x: int
+    crop_y: int
+    crop_width: int
+    crop_height: int
+    confidence: int
+
+
+class AutoFrameResponse(BaseModel):
+    """Smart framing response"""
+    id: UUID
+    ai_generation_id: UUID
+    target_aspect_ratio: str
+    suggested_crop: CropSuggestion
+    alternative_crops: list[CropSuggestion] = []
+    output_url: Optional[str] = None
+    preview_url: Optional[str] = None
+    status: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class TrendSuggestionResponse(BaseModel):
+    """Trend suggestion response"""
+    id: UUID
+    trend_type: str
+    trend_value: str
+    region: str
+    popularity_score: int
+    growth_rate: Optional[int] = None
+    recommended_duration: Optional[int] = None
+    best_posting_time: Optional[str] = None
+    related_trends: list[str] = []
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class TrendSuggestionsListResponse(BaseModel):
+    """List of trend suggestions"""
+    trends: list[TrendSuggestionResponse]
+    total: int
+    region: str
+
+
+class AIPreviewRequest(BaseModel):
+    """Request AI operation preview"""
+    operation_type: str
+    segment_id: UUID
+    parameters: dict
+
+
+class AIPreviewResponse(BaseModel):
+    """Preview of AI operation"""
+    preview_id: UUID
+    operation_type: str
+    preview_url: str
+    estimated_credits: int
+    estimated_processing_time: int
+
+
+class AICreditsResponse(BaseModel):
+    """AI credits information"""
+    total_credits: int
+    available_credits: int
+    used_credits: int
+    monthly_limit: int
+    renewal_date: Optional[datetime] = None
+
+
+class AIOperationHistoryResponse(BaseModel):
+    """AI operation history"""
+    id: UUID
+    operation_type: str
+    status: str
+    credits_used: int
+    created_at: datetime
 
 
 # ============================================================================

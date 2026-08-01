@@ -557,3 +557,264 @@ class Sticker(Base):
 
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class AIGenerationStatus(str, enum.Enum):
+    """Status of AI generation operations"""
+    PENDING = "pending"
+    PROCESSING = "processing"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
+class AIGeneration(Base):
+    """AI generation operations tracking"""
+    __tablename__ = "ai_generations"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    draft_id = Column(UUID(as_uuid=True), ForeignKey("drafts.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    # Operation details
+    operation_type = Column(String(50), nullable=False, index=True)  # voiceover, caption, background, etc.
+    status = Column(Enum(AIGenerationStatus), default=AIGenerationStatus.PENDING, nullable=False)
+
+    # Parameters and results
+    input_data = Column(String(2000), nullable=True)  # JSON input parameters
+    output_data = Column(String(5000), nullable=True)  # JSON output/result
+    error_message = Column(String(500), nullable=True)  # Error details if failed
+
+    # Credit tracking
+    credits_used = Column(Integer, default=0, nullable=False)
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    # Relationships
+    user = relationship("User", backref="ai_generations")
+    draft = relationship("Draft", backref="ai_generations")
+
+
+class BackgroundRemoval(Base):
+    """Background removal/replacement operations"""
+    __tablename__ = "background_removals"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    segment_id = Column(UUID(as_uuid=True), ForeignKey("segments.id", ondelete="CASCADE"), nullable=False, index=True)
+    ai_generation_id = Column(UUID(as_uuid=True), ForeignKey("ai_generations.id", ondelete="CASCADE"), nullable=False)
+
+    # Operation mode
+    mode = Column(String(50), nullable=False)  # blur, remove, replace, green_screen
+    blur_level = Column(Integer, default=5, nullable=False)  # 0-10 for blur
+
+    # Replace background
+    background_url = Column(String(500), nullable=True)  # URL to replacement background
+    background_type = Column(String(50), nullable=True)  # image, video, color, blur
+
+    # Results
+    output_url = Column(String(500), nullable=True)  # Processed video/image URL
+    preview_url = Column(String(500), nullable=True)  # Preview thumbnail
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    # Relationships
+    segment = relationship("Segment", backref="background_removals")
+
+
+class Voiceover(Base):
+    """Text-to-speech voiceover generation"""
+    __tablename__ = "voiceovers"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    segment_id = Column(UUID(as_uuid=True), ForeignKey("segments.id", ondelete="CASCADE"), nullable=False, index=True)
+    ai_generation_id = Column(UUID(as_uuid=True), ForeignKey("ai_generations.id", ondelete="CASCADE"), nullable=False)
+
+    # Text input
+    text = Column(Text, nullable=False)
+
+    # Voice configuration
+    language = Column(String(20), default="en", nullable=False)  # en, es, fr, de, etc.
+    voice_id = Column(String(50), nullable=False)  # Specific voice identifier
+    gender = Column(String(20), nullable=True)  # male, female, neutral
+    emotion = Column(String(50), nullable=True)  # happy, sad, angry, neutral, etc.
+
+    # Audio properties
+    speed = Column(Integer, default=100, nullable=False)  # 50-200% (100 = normal)
+    pitch = Column(Integer, default=100, nullable=False)  # 50-200% (100 = normal)
+    volume = Column(Integer, default=100, nullable=False)  # 0-100%
+
+    # Results
+    audio_url = Column(String(500), nullable=True)  # Generated audio file URL
+    duration = Column(Integer, nullable=True)  # Audio duration in milliseconds
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    # Relationships
+    segment = relationship("Segment", backref="voiceovers")
+
+
+class AutoCaption(Base):
+    """Auto-generated captions/subtitles"""
+    __tablename__ = "auto_captions"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    segment_id = Column(UUID(as_uuid=True), ForeignKey("segments.id", ondelete="CASCADE"), nullable=False, index=True)
+    ai_generation_id = Column(UUID(as_uuid=True), ForeignKey("ai_generations.id", ondelete="CASCADE"), nullable=False)
+
+    # Caption configuration
+    language = Column(String(20), default="en", nullable=False)
+    style = Column(String(50), default="default", nullable=False)  # default, bold, shadow, background, etc.
+
+    # Styling
+    font_family = Column(String(100), default="Arial", nullable=False)
+    font_size = Column(Integer, default=24, nullable=False)
+    color = Column(String(7), default="#FFFFFF", nullable=False)  # Hex color
+    background_color = Column(String(7), nullable=True)
+
+    # Position
+    position = Column(String(50), default="bottom", nullable=False)  # top, middle, bottom
+
+    # Results
+    captions_data = Column(String(5000), nullable=True)  # JSON array of caption objects
+    vtt_url = Column(String(500), nullable=True)  # WebVTT subtitle file URL
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    # Relationships
+    segment = relationship("Segment", backref="auto_captions")
+
+
+class SoundRecommendation(Base):
+    """AI-recommended sounds and music"""
+    __tablename__ = "sound_recommendations"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    draft_id = Column(UUID(as_uuid=True), ForeignKey("drafts.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    # Sound details
+    sound_url = Column(String(500), nullable=False)
+    sound_title = Column(String(255), nullable=False)
+    artist = Column(String(255), nullable=True)
+
+    # Categorization
+    category = Column(String(50), nullable=False, index=True)  # background, sound_effect, music, etc.
+    mood = Column(String(50), nullable=True)  # happy, sad, epic, calm, energetic, etc.
+    genre = Column(String(50), nullable=True)  # pop, rock, classical, etc.
+    region = Column(String(50), nullable=True)  # trending in region
+
+    # Properties
+    duration = Column(Integer, nullable=True)  # Duration in milliseconds
+    is_trending = Column(Boolean, default=False, nullable=False)
+
+    # License info
+    license_type = Column(String(50), nullable=False)  # royalty_free, creative_commons, etc.
+    credit_required = Column(String(255), nullable=True)
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    # Relationships
+    user = relationship("User", backref="sound_recommendations")
+    draft = relationship("Draft", backref="sound_recommendations")
+
+
+class ColorCorrection(Base):
+    """AI color grading/correction"""
+    __tablename__ = "color_corrections"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    segment_id = Column(UUID(as_uuid=True), ForeignKey("segments.id", ondelete="CASCADE"), nullable=False, index=True)
+    ai_generation_id = Column(UUID(as_uuid=True), ForeignKey("ai_generations.id", ondelete="CASCADE"), nullable=False)
+
+    # Correction method
+    method = Column(String(50), nullable=False)  # preset, auto_enhance, lut, custom
+    preset_name = Column(String(100), nullable=True)  # cinematic, vintage, desaturated, etc.
+
+    # Color adjustments
+    brightness = Column(Integer, default=0, nullable=False)  # -100 to 100
+    contrast = Column(Integer, default=0, nullable=False)  # -100 to 100
+    saturation = Column(Integer, default=0, nullable=False)  # -100 to 100
+    hue = Column(Integer, default=0, nullable=False)  # -180 to 180
+    temperature = Column(Integer, default=0, nullable=False)  # -100 to 100 (warm to cool)
+
+    # Results
+    output_url = Column(String(500), nullable=True)  # Processed video URL
+    preview_url = Column(String(500), nullable=True)  # Preview thumbnail
+    lut_file_url = Column(String(500), nullable=True)  # LUT file if applicable
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    # Relationships
+    segment = relationship("Segment", backref="color_corrections")
+
+
+class AutoFrame(Base):
+    """Smart framing suggestions"""
+    __tablename__ = "auto_frames"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    segment_id = Column(UUID(as_uuid=True), ForeignKey("segments.id", ondelete="CASCADE"), nullable=False, index=True)
+    ai_generation_id = Column(UUID(as_uuid=True), ForeignKey("ai_generations.id", ondelete="CASCADE"), nullable=False)
+
+    # Framing configuration
+    target_aspect_ratio = Column(String(20), nullable=False)  # 16:9, 9:16, 1:1, etc.
+    detected_objects = Column(String(500), nullable=True)  # JSON array of detected objects
+
+    # Suggested crop
+    crop_x = Column(Integer, nullable=False)  # Starting X coordinate
+    crop_y = Column(Integer, nullable=False)  # Starting Y coordinate
+    crop_width = Column(Integer, nullable=False)  # Crop width
+    crop_height = Column(Integer, nullable=False)  # Crop height
+
+    # Alternatives
+    alternative_crops = Column(String(1000), nullable=True)  # JSON array of alternative crops
+
+    # Results
+    output_url = Column(String(500), nullable=True)  # Framed video/image URL
+    preview_url = Column(String(500), nullable=True)  # Preview thumbnail
+    confidence = Column(Integer, nullable=False)  # 0-100 confidence score
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    # Relationships
+    segment = relationship("Segment", backref="auto_frames")
+
+
+class TrendSuggestion(Base):
+    """AI trending content suggestions"""
+    __tablename__ = "trend_suggestions"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    draft_id = Column(UUID(as_uuid=True), ForeignKey("drafts.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    # Trend details
+    trend_type = Column(String(50), nullable=False, index=True)  # hashtag, sound, effect, format, etc.
+    trend_value = Column(String(255), nullable=False)  # The actual trend (#TikTokDance, etc.)
+
+    # Metadata
+    region = Column(String(50), nullable=False)  # US, UK, Global, etc.
+    popularity_score = Column(Integer, nullable=False)  # 0-100 based on current popularity
+    growth_rate = Column(Integer, nullable=True)  # Positive/negative growth percentage
+
+    # Usage recommendations
+    recommended_duration = Column(Integer, nullable=True)  # Milliseconds for optimal engagement
+    best_posting_time = Column(String(50), nullable=True)  # Time of day recommendation
+
+    # Related trends
+    related_trends = Column(String(500), nullable=True)  # JSON array of related trends
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    expires_at = Column(DateTime, nullable=True)  # When trend expires
+
+    # Relationships
+    user = relationship("User", backref="trend_suggestions")
+    draft = relationship("Draft", backref="trend_suggestions")
