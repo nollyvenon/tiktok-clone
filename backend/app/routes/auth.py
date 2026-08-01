@@ -14,7 +14,7 @@ from app.schemas import (
     RefreshTokenRequest, LogoutRequest, PasswordChangeRequest,
     PasswordResetRequest, PasswordResetConfirm, ErrorResponse,
     SendOTPRequest, VerifyOTPRequest, TwoFactorSetupRequest, TwoFactorVerifyRequest,
-    OAuthCallbackRequest
+    OAuthCallbackRequest, SessionResponse, SessionsListResponse
 )
 from app.services.auth import AuthService
 from app.services.oauth import OAuthService, OAuthProviderConfig
@@ -389,6 +389,8 @@ async def oauth_callback(
 async def logout(
     current_user: User = Depends(get_current_user),
     request: Optional[LogoutRequest] = None,
+    everywhere: bool = False,
+    authorization: str = Header(None),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -396,11 +398,23 @@ async def logout(
 
     **Authorization:** Requires valid access token in header
 
-    **Request body (optional):**
-    - refresh_token: Optional refresh token (will be invalidated)
+    **Query params:**
+    - everywhere: If true, revoke all of the user's sessions across every
+      device. Defaults to false, which only revokes the current session.
     """
     try:
-        await AuthService.logout(db, current_user.id)
+        if everywhere:
+            await AuthService.logout(db, current_user.id)
+        else:
+            token = authorization.split()[1]
+            payload = verify_token(token)
+            current_jti = payload.get("jti") if payload else None
+            session_id = None
+            if current_jti:
+                sessions = await AuthService.get_active_sessions(db, current_user.id)
+                match = next((s for s in sessions if s.access_token_jti == current_jti), None)
+                session_id = match.id if match else None
+            await AuthService.logout(db, current_user.id, session_id=session_id)
         return {"message": "Logged out successfully"}
     except Exception as e:
         logger.error(f"Logout error: {e}")
@@ -408,6 +422,63 @@ async def logout(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Logout failed",
         )
+
+
+@router.get(
+    "/sessions",
+    response_model=SessionsListResponse,
+    responses={
+        200: {"description": "Active sessions/devices"},
+        401: {"model": ErrorResponse, "description": "Unauthorized"},
+    },
+)
+async def list_sessions(
+    current_user: User = Depends(get_current_user),
+    authorization: str = Header(None),
+    db: AsyncSession = Depends(get_db),
+):
+    """List the current user's active sessions (devices logged in)"""
+    token = authorization.split()[1]
+    payload = verify_token(token)
+    current_jti = payload.get("jti") if payload else None
+
+    sessions = await AuthService.get_active_sessions(db, current_user.id)
+    return SessionsListResponse(
+        sessions=[
+            SessionResponse(
+                id=s.id,
+                device_id=s.device_id,
+                device_name=s.device_name,
+                ip_address=s.ip_address,
+                is_current=(s.access_token_jti == current_jti),
+                created_at=s.created_at,
+                last_activity=s.last_activity,
+            )
+            for s in sessions
+        ]
+    )
+
+
+@router.delete(
+    "/sessions/{session_id}",
+    status_code=status.HTTP_200_OK,
+    responses={
+        200: {"description": "Session revoked"},
+        404: {"model": ErrorResponse, "description": "Session not found"},
+    },
+)
+async def revoke_session(
+    session_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Revoke a specific session/device - e.g. to remotely sign out a lost device"""
+    from uuid import UUID as UUIDType
+
+    revoked = await AuthService.revoke_session(db, current_user.id, UUIDType(session_id))
+    if not revoked:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
+    return {"message": "Session revoked"}
 
 
 @router.get(

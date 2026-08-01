@@ -214,6 +214,136 @@ async def test_logout_no_token(test_client: AsyncClient):
 
 
 @pytest.mark.asyncio
+async def test_logout_revokes_access_token_immediately(test_client: AsyncClient, register_user_data):
+    """
+    A logged-out access token must stop working immediately, not just once
+    it naturally expires - logout must invalidate the underlying session,
+    not merely be a client-side no-op.
+    """
+    register_response = await test_client.post("/api/auth/register", json=register_user_data)
+    access_token = register_response.json()["access_token"]
+
+    # Token works before logout
+    pre_logout = await test_client.get(
+        "/api/auth/me", headers={"Authorization": f"Bearer {access_token}"}
+    )
+    assert pre_logout.status_code == 200
+
+    await test_client.post("/api/auth/logout", headers={"Authorization": f"Bearer {access_token}"})
+
+    # Same token must be rejected after logout, even though the JWT itself
+    # has not expired
+    post_logout = await test_client.get(
+        "/api/auth/me", headers={"Authorization": f"Bearer {access_token}"}
+    )
+    assert post_logout.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_default_logout_only_revokes_current_session(test_client: AsyncClient, register_user_data):
+    """Logging out on one device must not sign the user out everywhere else"""
+    register_response = await test_client.post("/api/auth/register", json=register_user_data)
+    token_a = register_response.json()["access_token"]
+
+    login_response = await test_client.post(
+        "/api/auth/login",
+        json={"email": register_user_data["email"], "password": register_user_data["password"]},
+    )
+    token_b = login_response.json()["access_token"]
+
+    await test_client.post("/api/auth/logout", headers={"Authorization": f"Bearer {token_a}"})
+
+    # Session A is dead, session B is untouched
+    resp_a = await test_client.get("/api/auth/me", headers={"Authorization": f"Bearer {token_a}"})
+    resp_b = await test_client.get("/api/auth/me", headers={"Authorization": f"Bearer {token_b}"})
+    assert resp_a.status_code == 401
+    assert resp_b.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_logout_everywhere_revokes_all_sessions(test_client: AsyncClient, register_user_data):
+    """?everywhere=true must revoke every session for the user, not just the current one"""
+    register_response = await test_client.post("/api/auth/register", json=register_user_data)
+    token_a = register_response.json()["access_token"]
+
+    login_response = await test_client.post(
+        "/api/auth/login",
+        json={"email": register_user_data["email"], "password": register_user_data["password"]},
+    )
+    token_b = login_response.json()["access_token"]
+
+    await test_client.post(
+        "/api/auth/logout?everywhere=true", headers={"Authorization": f"Bearer {token_a}"}
+    )
+
+    resp_a = await test_client.get("/api/auth/me", headers={"Authorization": f"Bearer {token_a}"})
+    resp_b = await test_client.get("/api/auth/me", headers={"Authorization": f"Bearer {token_b}"})
+    assert resp_a.status_code == 401
+    assert resp_b.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_list_sessions(test_client: AsyncClient, register_user_data):
+    """Listing sessions shows all active devices and marks the current one"""
+    register_response = await test_client.post("/api/auth/register", json=register_user_data)
+    token_a = register_response.json()["access_token"]
+
+    await test_client.post(
+        "/api/auth/login",
+        json={"email": register_user_data["email"], "password": register_user_data["password"]},
+    )
+
+    response = await test_client.get("/api/auth/sessions", headers={"Authorization": f"Bearer {token_a}"})
+    assert response.status_code == 200
+    sessions = response.json()["sessions"]
+    assert len(sessions) == 2
+    current_sessions = [s for s in sessions if s["is_current"]]
+    assert len(current_sessions) == 1
+
+
+@pytest.mark.asyncio
+async def test_revoke_specific_session(test_client: AsyncClient, register_user_data):
+    """Revoking another device's session logs that device out without affecting the current one"""
+    register_response = await test_client.post("/api/auth/register", json=register_user_data)
+    token_a = register_response.json()["access_token"]
+
+    login_response = await test_client.post(
+        "/api/auth/login",
+        json={"email": register_user_data["email"], "password": register_user_data["password"]},
+    )
+    token_b = login_response.json()["access_token"]
+
+    sessions_response = await test_client.get(
+        "/api/auth/sessions", headers={"Authorization": f"Bearer {token_a}"}
+    )
+    other_session = next(s for s in sessions_response.json()["sessions"] if not s["is_current"])
+
+    revoke_response = await test_client.delete(
+        f"/api/auth/sessions/{other_session['id']}",
+        headers={"Authorization": f"Bearer {token_a}"},
+    )
+    assert revoke_response.status_code == 200
+
+    resp_a = await test_client.get("/api/auth/me", headers={"Authorization": f"Bearer {token_a}"})
+    resp_b = await test_client.get("/api/auth/me", headers={"Authorization": f"Bearer {token_b}"})
+    assert resp_a.status_code == 200
+    assert resp_b.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_revoke_nonexistent_session_returns_404(test_client: AsyncClient, register_user_data):
+    """Revoking a made-up session id returns 404, not a silent success"""
+    register_response = await test_client.post("/api/auth/register", json=register_user_data)
+    token = register_response.json()["access_token"]
+
+    fake_id = "00000000-0000-0000-0000-000000000000"
+    response = await test_client.delete(
+        f"/api/auth/sessions/{fake_id}", headers={"Authorization": f"Bearer {token}"}
+    )
+    assert response.status_code == 404
+
+
+@pytest.mark.asyncio
 async def test_change_password_success(test_client: AsyncClient, register_user_data):
     """Test password change"""
     # Register user

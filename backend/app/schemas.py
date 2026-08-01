@@ -102,6 +102,25 @@ class OAuthCallbackRequest(BaseModel):
     redirect_uri: str
 
 
+class SessionResponse(BaseModel):
+    """Active session / device info"""
+    id: UUID
+    device_id: Optional[str] = None
+    device_name: Optional[str] = None
+    ip_address: Optional[str] = None
+    is_current: bool = False
+    created_at: datetime
+    last_activity: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class SessionsListResponse(BaseModel):
+    """List of active sessions"""
+    sessions: list[SessionResponse]
+
+
 class PhoneRegisterRequest(BaseModel):
     """Phone-based registration request"""
     phone: str = Field(..., min_length=10, max_length=20)

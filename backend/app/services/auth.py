@@ -270,6 +270,31 @@ class AuthService:
         logger.info(f"User logged out: {user_id}")
 
     @staticmethod
+    async def get_active_sessions(db: AsyncSession, user_id: UUID) -> list[Session]:
+        """List a user's active (non-revoked) sessions, most recent first"""
+        result = await db.execute(
+            select(Session)
+            .where(and_(Session.user_id == user_id, Session.is_active == True))
+            .order_by(Session.last_activity.desc())
+        )
+        return list(result.scalars().all())
+
+    @staticmethod
+    async def revoke_session(db: AsyncSession, user_id: UUID, session_id: UUID) -> bool:
+        """Revoke a single session belonging to the user. Returns False if not found."""
+        result = await db.execute(
+            select(Session).where(
+                and_(Session.id == session_id, Session.user_id == user_id)
+            )
+        )
+        session = result.scalar()
+        if not session:
+            return False
+        session.is_active = False
+        await db.commit()
+        return True
+
+    @staticmethod
     async def get_current_user(
         db: AsyncSession,
         access_token: str,
@@ -290,12 +315,28 @@ class AuthService:
             return None
 
         user_id = payload.get("sub")
-        if not user_id:
+        jti = payload.get("jti")
+        if not user_id or not jti:
             return None
 
         try:
             user_id = UUID(user_id)
         except ValueError:
+            return None
+
+        # Reject tokens whose session has been logged out, even if the JWT
+        # itself has not yet expired (logout / logout-everywhere must take
+        # effect immediately, not just for future refreshes).
+        session_result = await db.execute(
+            select(Session).where(
+                and_(
+                    Session.user_id == user_id,
+                    Session.access_token_jti == jti,
+                    Session.is_active == True,
+                )
+            )
+        )
+        if not session_result.scalar():
             return None
 
         # Find user

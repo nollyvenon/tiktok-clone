@@ -14,7 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
-from app.models import User, OAuthToken, OAuthProvider, UserRole
+from app.models import User, OAuthToken, OAuthProvider, UserRole, Session
 from app.security import create_access_token, create_refresh_token, generate_random_token
 
 logger = logging.getLogger(__name__)
@@ -261,10 +261,23 @@ class OAuthService:
             db.add(oauth_token)
 
         user.last_login = datetime.utcnow()
+
+        access_token, access_jti = create_access_token(str(user.id))
+        refresh_token, refresh_jti = create_refresh_token(str(user.id))
+
+        # A Session row is required for get_current_user's revocation check
+        # to pass - without it, logout couldn't invalidate OAuth-issued
+        # tokens the same way it does password-login tokens.
+        session = Session(
+            user_id=user.id,
+            device_name=f"OAuth ({provider})",
+            access_token_jti=access_jti,
+            refresh_token_jti=refresh_jti,
+            is_active=True,
+        )
+        db.add(session)
+
         await db.commit()
         await db.refresh(user)
-
-        access_token, _ = create_access_token(str(user.id))
-        refresh_token, _ = create_refresh_token(str(user.id))
 
         return user, access_token, refresh_token

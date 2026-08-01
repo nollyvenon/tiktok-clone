@@ -137,6 +137,15 @@ async def test_callback_creates_new_user(test_client: AsyncClient, test_db, monk
     assert "access_token" in data
     assert "refresh_token" in data
 
+    # The issued access token must actually work for authenticated requests -
+    # this catches OAuth logins that mint tokens without a backing Session row.
+    me_response = await test_client.get(
+        "/api/auth/me",
+        headers={"Authorization": f"Bearer {data['access_token']}"},
+    )
+    assert me_response.status_code == 200
+    assert me_response.json()["email"] == "oauthuser@example.com"
+
 
 @pytest.mark.asyncio
 async def test_callback_reuses_existing_oauth_link(test_client: AsyncClient, test_db, monkeypatch):
