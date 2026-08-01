@@ -75,6 +75,12 @@ class Settings(BaseSettings):
     GITHUB_CLIENT_SECRET: Optional[str] = None
     APPLE_CLIENT_ID: Optional[str] = None
     APPLE_TEAM_ID: Optional[str] = None
+    FACEBOOK_CLIENT_ID: Optional[str] = None
+    FACEBOOK_CLIENT_SECRET: Optional[str] = None
+    TIKTOK_CLIENT_ID: Optional[str] = None
+    TIKTOK_CLIENT_SECRET: Optional[str] = None
+    OAUTH_STATE_SECRET: str = "oauth_state_secret_change_in_production"
+    OAUTH_STATE_TTL_SECONDS: int = 600
 
     # OpenAI
     OPENAI_API_KEY: Optional[str] = None

@@ -95,9 +95,11 @@ class OAuthAuthorizationRequest(BaseModel):
 
 
 class OAuthCallbackRequest(BaseModel):
-    """OAuth callback request"""
+    """OAuth callback request - exchanges an authorization code for app tokens"""
     provider: str
-    access_token: str
+    code: str
+    state: str
+    redirect_uri: str
 
 
 class PhoneRegisterRequest(BaseModel):

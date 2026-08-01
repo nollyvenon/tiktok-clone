@@ -104,9 +104,9 @@ class SearchService:
         search_filter = and_(
             User.is_active == True,
             or_(
-                ilike(User.username, f"%{query}%"),
-                ilike(User.first_name, f"%{query}%"),
-                ilike(User.last_name, f"%{query}%"),
+                User.username.ilike(f"%{query}%"),
+                User.first_name.ilike(f"%{query}%"),
+                User.last_name.ilike(f"%{query}%"),
             ),
         )
 
@@ -301,9 +301,9 @@ class SearchService:
         if query:
             filters.append(
                 or_(
-                    ilike(Video.title, f"%{query}%"),
-                    ilike(Video.description, f"%{query}%"),
-                    ilike(Video.hashtags, f"%{query}%"),
+                    Video.title.ilike(f"%{query}%"),
+                    Video.description.ilike(f"%{query}%"),
+                    Video.hashtags.ilike(f"%{query}%"),
                 )
             )
 

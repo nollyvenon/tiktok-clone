@@ -110,6 +110,142 @@ async def get_feed(
         )
 
 
+# ============================================================================
+# Search & Trending
+# ============================================================================
+
+@router.get(
+    "/search/trending",
+    response_model=FeedResponse,
+    responses={
+        200: {"description": "Trending videos"},
+    },
+)
+async def get_trending(
+    limit: int = Query(20, ge=1, le=50),
+    offset: int = Query(0, ge=0),
+    timeframe_hours: int = Query(24, ge=1, le=168),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Get trending videos
+
+    **Parameters:**
+    - limit: Number of videos (default 20)
+    - offset: Pagination offset
+    - timeframe_hours: Time period (1-168 hours, default 24)
+    """
+    try:
+        videos, total = await VideoService.get_trending_videos(
+            db, limit=limit, offset=offset, timeframe_hours=timeframe_hours
+        )
+
+        video_responses = []
+        for video in videos:
+            user = await ProfileService.get_user_profile(db, video.user_id)
+            video_responses.append(
+                VideoDetailResponse(
+                    id=video.id,
+                    user_id=video.user_id,
+                    user=UserPublicProfile.from_orm(user),
+                    title=video.title,
+                    description=video.description,
+                    video_url=video.video_url,
+                    thumbnail_url=video.thumbnail_url,
+                    duration=video.duration,
+                    hashtags=video.hashtags,
+                    location=video.location,
+                    is_public=video.is_public,
+                    views_count=video.views_count,
+                    likes_count=video.likes_count,
+                    comments_count=video.comments_count,
+                    shares_count=video.shares_count,
+                    bookmarks_count=video.bookmarks_count,
+                    completion_rate=video.completion_rate,
+                    created_at=video.created_at,
+                    published_at=video.published_at,
+                    is_liked=False,
+                    is_bookmarked=False,
+                    allow_comments=video.allow_comments,
+                    allow_duets=video.allow_duets,
+                    allow_stitches=video.allow_stitches,
+                )
+            )
+
+        return FeedResponse(videos=video_responses, total=total)
+    except Exception as e:
+        logger.error(f"Get trending error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve trending videos",
+        )
+
+
+@router.get(
+    "/search",
+    response_model=FeedResponse,
+    responses={
+        200: {"description": "Search results"},
+    },
+)
+async def search_videos(
+    q: str = Query(..., description="Search query"),
+    limit: int = Query(20, ge=1, le=50),
+    offset: int = Query(0, ge=0),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Search videos
+
+    **Parameters:**
+    - q: Search query (required)
+    - limit: Number of results (default 20)
+    - offset: Pagination offset
+    """
+    try:
+        videos, total = await VideoService.search_videos(db, q, limit=limit, offset=offset)
+
+        video_responses = []
+        for video in videos:
+            user = await ProfileService.get_user_profile(db, video.user_id)
+            video_responses.append(
+                VideoDetailResponse(
+                    id=video.id,
+                    user_id=video.user_id,
+                    user=UserPublicProfile.from_orm(user),
+                    title=video.title,
+                    description=video.description,
+                    video_url=video.video_url,
+                    thumbnail_url=video.thumbnail_url,
+                    duration=video.duration,
+                    hashtags=video.hashtags,
+                    location=video.location,
+                    is_public=video.is_public,
+                    views_count=video.views_count,
+                    likes_count=video.likes_count,
+                    comments_count=video.comments_count,
+                    shares_count=video.shares_count,
+                    bookmarks_count=video.bookmarks_count,
+                    completion_rate=video.completion_rate,
+                    created_at=video.created_at,
+                    published_at=video.published_at,
+                    is_liked=False,
+                    is_bookmarked=False,
+                    allow_comments=video.allow_comments,
+                    allow_duets=video.allow_duets,
+                    allow_stitches=video.allow_stitches,
+                )
+            )
+
+        return FeedResponse(videos=video_responses, total=total)
+    except Exception as e:
+        logger.error(f"Search videos error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to search videos",
+        )
+
+
 @router.get(
     "/{video_id}",
     response_model=VideoDetailResponse,
@@ -522,137 +658,3 @@ async def get_analytics(
         )
 
 
-# ============================================================================
-# Search & Trending
-# ============================================================================
-
-@router.get(
-    "/search/trending",
-    response_model=FeedResponse,
-    responses={
-        200: {"description": "Trending videos"},
-    },
-)
-async def get_trending(
-    limit: int = Query(20, ge=1, le=50),
-    offset: int = Query(0, ge=0),
-    timeframe_hours: int = Query(24, ge=1, le=168),
-    db: AsyncSession = Depends(get_db),
-):
-    """
-    Get trending videos
-
-    **Parameters:**
-    - limit: Number of videos (default 20)
-    - offset: Pagination offset
-    - timeframe_hours: Time period (1-168 hours, default 24)
-    """
-    try:
-        videos, total = await VideoService.get_trending_videos(
-            db, limit=limit, offset=offset, timeframe_hours=timeframe_hours
-        )
-
-        video_responses = []
-        for video in videos:
-            user = await ProfileService.get_user_profile(db, video.user_id)
-            video_responses.append(
-                VideoDetailResponse(
-                    id=video.id,
-                    user_id=video.user_id,
-                    user=UserPublicProfile.from_orm(user),
-                    title=video.title,
-                    description=video.description,
-                    video_url=video.video_url,
-                    thumbnail_url=video.thumbnail_url,
-                    duration=video.duration,
-                    hashtags=video.hashtags,
-                    location=video.location,
-                    is_public=video.is_public,
-                    views_count=video.views_count,
-                    likes_count=video.likes_count,
-                    comments_count=video.comments_count,
-                    shares_count=video.shares_count,
-                    bookmarks_count=video.bookmarks_count,
-                    completion_rate=video.completion_rate,
-                    created_at=video.created_at,
-                    published_at=video.published_at,
-                    is_liked=False,
-                    is_bookmarked=False,
-                    allow_comments=video.allow_comments,
-                    allow_duets=video.allow_duets,
-                    allow_stitches=video.allow_stitches,
-                )
-            )
-
-        return FeedResponse(videos=video_responses, total=total)
-    except Exception as e:
-        logger.error(f"Get trending error: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to retrieve trending videos",
-        )
-
-
-@router.get(
-    "/search",
-    response_model=FeedResponse,
-    responses={
-        200: {"description": "Search results"},
-    },
-)
-async def search_videos(
-    q: str = Query(..., description="Search query"),
-    limit: int = Query(20, ge=1, le=50),
-    offset: int = Query(0, ge=0),
-    db: AsyncSession = Depends(get_db),
-):
-    """
-    Search videos
-
-    **Parameters:**
-    - q: Search query (required)
-    - limit: Number of results (default 20)
-    - offset: Pagination offset
-    """
-    try:
-        videos, total = await VideoService.search_videos(db, q, limit=limit, offset=offset)
-
-        video_responses = []
-        for video in videos:
-            user = await ProfileService.get_user_profile(db, video.user_id)
-            video_responses.append(
-                VideoDetailResponse(
-                    id=video.id,
-                    user_id=video.user_id,
-                    user=UserPublicProfile.from_orm(user),
-                    title=video.title,
-                    description=video.description,
-                    video_url=video.video_url,
-                    thumbnail_url=video.thumbnail_url,
-                    duration=video.duration,
-                    hashtags=video.hashtags,
-                    location=video.location,
-                    is_public=video.is_public,
-                    views_count=video.views_count,
-                    likes_count=video.likes_count,
-                    comments_count=video.comments_count,
-                    shares_count=video.shares_count,
-                    bookmarks_count=video.bookmarks_count,
-                    completion_rate=video.completion_rate,
-                    created_at=video.created_at,
-                    published_at=video.published_at,
-                    is_liked=False,
-                    is_bookmarked=False,
-                    allow_comments=video.allow_comments,
-                    allow_duets=video.allow_duets,
-                    allow_stitches=video.allow_stitches,
-                )
-            )
-
-        return FeedResponse(videos=video_responses, total=total)
-    except Exception as e:
-        logger.error(f"Search videos error: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to search videos",
-        )

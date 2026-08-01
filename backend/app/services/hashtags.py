@@ -309,22 +309,15 @@ class HashtagService:
             return [], 0
 
         # Get videos with challenge hashtag
-        result = await db.execute(
-            select(Video)
-            .where(
+        count_result = await db.execute(
+            select(func.count(Video.id)).where(
                 and_(
                     Video.hashtags.ilike(f"%{challenge.hashtag}%"),
                     Video.status == VideoStatus.PUBLISHED,
                 )
             )
-            .order_by(desc(Video.published_at))
         )
-        total = len((await db.execute(select(func.count(Video.id)).where(
-            and_(
-                Video.hashtags.ilike(f"%{challenge.hashtag}%"),
-                Video.status == VideoStatus.PUBLISHED,
-            )
-        ))).scalar() or 0)
+        total = count_result.scalar() or 0
 
         result = await db.execute(
             select(Video)

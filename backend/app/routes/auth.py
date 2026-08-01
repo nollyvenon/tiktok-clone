@@ -3,6 +3,7 @@ Authentication API routes
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status, Header, Request
+from fastapi.responses import RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
 import logging
@@ -12,11 +13,15 @@ from app.schemas import (
     RegisterRequest, LoginRequest, TokenResponse, UserResponse,
     RefreshTokenRequest, LogoutRequest, PasswordChangeRequest,
     PasswordResetRequest, PasswordResetConfirm, ErrorResponse,
-    SendOTPRequest, VerifyOTPRequest, TwoFactorSetupRequest, TwoFactorVerifyRequest
+    SendOTPRequest, VerifyOTPRequest, TwoFactorSetupRequest, TwoFactorVerifyRequest,
+    OAuthCallbackRequest
 )
 from app.services.auth import AuthService
+from app.services.oauth import OAuthService, OAuthProviderConfig
 from app.security import verify_token
 from app.models import User
+
+SUPPORTED_OAUTH_PROVIDERS = {"google", "facebook", "tiktok"}
 
 logger = logging.getLogger(__name__)
 
@@ -289,6 +294,83 @@ async def confirm_password_reset(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Password reset failed",
+        )
+
+
+# ============================================================================
+# OAuth Routes
+# ============================================================================
+
+@router.get(
+    "/oauth/{provider}/authorize",
+    responses={
+        307: {"description": "Redirect to provider's OAuth consent screen"},
+        400: {"model": ErrorResponse, "description": "Unsupported or unconfigured provider"},
+    },
+)
+async def oauth_authorize(provider: str, redirect_uri: str):
+    """
+    Begin OAuth flow by redirecting to the provider's authorization page
+
+    **Path params:**
+    - provider: google, facebook, or tiktok
+
+    **Query params:**
+    - redirect_uri: URI the provider should redirect back to after consent
+    """
+    if provider not in SUPPORTED_OAUTH_PROVIDERS:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported OAuth provider")
+
+    try:
+        url = OAuthService.get_authorization_url(provider, redirect_uri)
+        return RedirectResponse(url=url, status_code=status.HTTP_307_TEMPORARY_REDIRECT)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.post(
+    "/oauth/callback",
+    response_model=TokenResponse,
+    responses={
+        200: {"description": "OAuth login successful"},
+        400: {"model": ErrorResponse, "description": "Invalid or expired OAuth state/code"},
+    },
+)
+async def oauth_callback(
+    request: OAuthCallbackRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Complete OAuth flow: exchanges the authorization code for provider tokens,
+    fetches the user's profile, finds or creates the matching account, and
+    issues app JWT tokens.
+
+    **Request body:**
+    - provider: google, facebook, or tiktok
+    - code: Authorization code returned by the provider
+    - state: Signed state token issued by /oauth/{provider}/authorize
+    - redirect_uri: Must match the redirect_uri used to start the flow
+    """
+    if request.provider not in SUPPORTED_OAUTH_PROVIDERS:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported OAuth provider")
+
+    try:
+        user, access_token, refresh_token = await OAuthService.handle_callback(
+            db, request.provider, request.code, request.state, request.redirect_uri
+        )
+        return TokenResponse(
+            access_token=access_token,
+            refresh_token=refresh_token,
+            expires_in=86400,
+            user=UserResponse.from_orm(user),
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception as e:
+        logger.error(f"OAuth callback error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="OAuth login failed",
         )
 
 

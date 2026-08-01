@@ -9,7 +9,7 @@ from uuid import UUID
 
 from app.models import User
 from app.database import get_db
-from app.auth import get_current_user
+from app.routes.auth import get_current_user
 from app.services.hashtags import HashtagService
 from app.schemas import (
     HashtagTrendResponse,

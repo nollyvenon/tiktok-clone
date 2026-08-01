@@ -12,7 +12,7 @@ from app.services.hashtags import HashtagService
 
 
 @pytest.mark.asyncio
-async def test_get_trending_hashtags(db: AsyncSession):
+async def test_get_trending_hashtags(test_db: AsyncSession):
     """Test getting trending hashtags"""
     # Create test hashtags
     hashtag1 = HashtagTrend(
@@ -31,32 +31,35 @@ async def test_get_trending_hashtags(db: AsyncSession):
         popularity_score=75,
         rank_position=2,
     )
-    db.add(hashtag1)
-    db.add(hashtag2)
-    await db.commit()
+    test_db.add(hashtag1)
+    test_db.add(hashtag2)
+    await test_db.commit()
 
     # Get trending
-    trends = await HashtagService.get_trending_hashtags(db, region="US", limit=10)
+    trends = await HashtagService.get_trending_hashtags(test_db, region="US", limit=10)
     assert len(trends) >= 2
 
 
 @pytest.mark.asyncio
-async def test_track_hashtag_usage(db: AsyncSession):
+async def test_track_hashtag_usage(test_db: AsyncSession):
     """Test tracking hashtag usage"""
     user_id = UUID("00000000-0000-0000-0000-000000000001")
 
     # Track usage
-    await HashtagService.track_hashtag_usage(db, "#trends", "US", user_id)
+    await HashtagService.track_hashtag_usage(test_db, "#trends", "US", user_id)
 
     # Verify trend was created
-    trend = await db.execute(
-        db.query(HashtagTrend).filter(HashtagTrend.hashtag == "#trends")
+    from sqlalchemy import select
+    result = await test_db.execute(
+        select(HashtagTrend).where(HashtagTrend.hashtag == "#trends")
     )
+    trend = result.scalar_one_or_none()
     assert trend is not None
+    assert trend.usage_count == 1
 
 
 @pytest.mark.asyncio
-async def test_get_hashtag_analytics(db: AsyncSession):
+async def test_get_hashtag_analytics(test_db: AsyncSession):
     """Test getting hashtag analytics"""
     hashtag = "dance"
 
@@ -69,22 +72,22 @@ async def test_get_hashtag_analytics(db: AsyncSession):
             usage_count=100 + (i * 10),
             unique_creators=20 + i,
         )
-        db.add(analytics)
-    await db.commit()
+        test_db.add(analytics)
+    await test_db.commit()
 
     # Get analytics
-    results = await HashtagService.get_hashtag_analytics(db, hashtag, days=30)
+    results = await HashtagService.get_hashtag_analytics(test_db, hashtag, days=30)
     assert len(results) > 0
 
 
 @pytest.mark.asyncio
-async def test_create_challenge(db: AsyncSession):
+async def test_create_challenge(test_db: AsyncSession):
     """Test creating a hashtag challenge"""
     start_date = datetime.utcnow()
     end_date = start_date + timedelta(days=7)
 
     challenge = await HashtagService.create_challenge(
-        db,
+        test_db,
         hashtag="dance",
         title="Dancing Challenge",
         description="Show your best moves",
@@ -100,7 +103,7 @@ async def test_create_challenge(db: AsyncSession):
 
 
 @pytest.mark.asyncio
-async def test_get_active_challenges(db: AsyncSession):
+async def test_get_active_challenges(test_db: AsyncSession):
     """Test getting active challenges"""
     now = datetime.utcnow()
 
@@ -112,16 +115,16 @@ async def test_get_active_challenges(db: AsyncSession):
         end_date=now + timedelta(days=6),
         is_active=True,
     )
-    db.add(challenge)
-    await db.commit()
+    test_db.add(challenge)
+    await test_db.commit()
 
     # Get active challenges
-    challenges = await HashtagService.get_active_challenges(db, region="US")
+    challenges = await HashtagService.get_active_challenges(test_db, region="US")
     assert len(challenges) > 0
 
 
 @pytest.mark.asyncio
-async def test_get_hashtag_stats(db: AsyncSession):
+async def test_get_hashtag_stats(test_db: AsyncSession):
     """Test getting hashtag statistics"""
     hashtag = "music"
     region = "US"
@@ -136,17 +139,17 @@ async def test_get_hashtag_stats(db: AsyncSession):
         total_likes=2000,
         popularity_score=70,
     )
-    db.add(trend)
-    await db.commit()
+    test_db.add(trend)
+    await test_db.commit()
 
     # Get stats
-    stats = await HashtagService.get_hashtag_stats(db, hashtag, region)
+    stats = await HashtagService.get_hashtag_stats(test_db, hashtag, region)
     assert stats["hashtag"] == hashtag
     assert stats["usage_count"] == 500
 
 
 @pytest.mark.asyncio
-async def test_search_hashtags(db: AsyncSession):
+async def test_search_hashtags(test_db: AsyncSession):
     """Test searching hashtags"""
     # Create test hashtags
     hashtag1 = HashtagTrend(
@@ -159,17 +162,17 @@ async def test_search_hashtags(db: AsyncSession):
         region="US",
         usage_count=300,
     )
-    db.add(hashtag1)
-    db.add(hashtag2)
-    await db.commit()
+    test_db.add(hashtag1)
+    test_db.add(hashtag2)
+    await test_db.commit()
 
     # Search
-    results = await HashtagService.search_hashtags(db, "dance", "US", limit=10)
+    results = await HashtagService.search_hashtags(test_db, "dance", "US", limit=10)
     assert len(results) > 0
 
 
 @pytest.mark.asyncio
-async def test_get_category_trends(db: AsyncSession):
+async def test_get_category_trends(test_db: AsyncSession):
     """Test getting trends by category"""
     # Create categorized hashtags
     hashtag1 = HashtagTrend(
@@ -186,19 +189,19 @@ async def test_get_category_trends(db: AsyncSession):
         usage_count=400,
         popularity_score=70,
     )
-    db.add(hashtag1)
-    db.add(hashtag2)
-    await db.commit()
+    test_db.add(hashtag1)
+    test_db.add(hashtag2)
+    await test_db.commit()
 
     # Get Entertainment trends
     results = await HashtagService.get_category_trends(
-        db, "Entertainment", "US", limit=10
+        test_db, "Entertainment", "US", limit=10
     )
     assert len(results) > 0
 
 
 @pytest.mark.asyncio
-async def test_calculate_trend_metrics(db: AsyncSession):
+async def test_calculate_trend_metrics(test_db: AsyncSession):
     """Test calculating trend metrics"""
     hashtag = "trending"
     region = "US"
@@ -209,7 +212,7 @@ async def test_calculate_trend_metrics(db: AsyncSession):
         region=region,
         usage_count=1000,
     )
-    db.add(trend)
+    test_db.add(trend)
 
     # Create analytics for past 7 days
     for i in range(7):
@@ -220,18 +223,18 @@ async def test_calculate_trend_metrics(db: AsyncSession):
             usage_count=100 + (i * 20),
             unique_creators=10 + i,
         )
-        db.add(analytics)
+        test_db.add(analytics)
 
-    await db.commit()
+    await test_db.commit()
 
     # Calculate metrics
-    metrics = await HashtagService.calculate_trend_metrics(db, hashtag, region)
+    metrics = await HashtagService.calculate_trend_metrics(test_db, hashtag, region)
     assert "popularity_score" in metrics
     assert "trend_velocity" in metrics
 
 
 @pytest.mark.asyncio
-async def test_update_challenge_stats(db: AsyncSession):
+async def test_update_challenge_stats(test_db: AsyncSession):
     """Test updating challenge participation stats"""
     challenge = Challenge(
         hashtag="dance",
@@ -240,20 +243,20 @@ async def test_update_challenge_stats(db: AsyncSession):
         end_date=datetime.utcnow() + timedelta(days=7),
         participation_count=0,
     )
-    db.add(challenge)
-    await db.commit()
+    test_db.add(challenge)
+    await test_db.commit()
 
     # Update stats
     video_id = UUID("00000000-0000-0000-0000-000000000001")
-    await HashtagService.update_challenge_stats(db, challenge.id, video_id)
+    await HashtagService.update_challenge_stats(test_db, challenge.id, video_id)
 
     # Verify
-    updated = await db.get(Challenge, challenge.id)
+    updated = await test_db.get(Challenge, challenge.id)
     assert updated.participation_count > 0
 
 
 @pytest.mark.asyncio
-async def test_get_challenge_details(db: AsyncSession):
+async def test_get_challenge_details(test_db: AsyncSession):
     """Test getting challenge details"""
     challenge = Challenge(
         hashtag="music",
@@ -262,17 +265,17 @@ async def test_get_challenge_details(db: AsyncSession):
         start_date=datetime.utcnow(),
         end_date=datetime.utcnow() + timedelta(days=7),
     )
-    db.add(challenge)
-    await db.commit()
+    test_db.add(challenge)
+    await test_db.commit()
 
     # Get details
-    result = await HashtagService.get_challenge_details(db, challenge.id)
+    result = await HashtagService.get_challenge_details(test_db, challenge.id)
     assert result is not None
     assert result.title == "Music Challenge"
 
 
 @pytest.mark.asyncio
-async def test_clean_old_analytics(db: AsyncSession):
+async def test_clean_old_analytics(test_db: AsyncSession):
     """Test cleaning old analytics records"""
     hashtag = "old"
 
@@ -285,7 +288,7 @@ async def test_clean_old_analytics(db: AsyncSession):
             usage_count=50,
             unique_creators=5,
         )
-        db.add(analytics)
+        test_db.add(analytics)
 
     # Create recent records
     recent = HashtagAnalytics(
@@ -294,16 +297,16 @@ async def test_clean_old_analytics(db: AsyncSession):
         usage_count=50,
         unique_creators=5,
     )
-    db.add(recent)
-    await db.commit()
+    test_db.add(recent)
+    await test_db.commit()
 
     # Clean old
-    deleted = await HashtagService.clean_old_analytics(db, days_old=90)
+    deleted = await HashtagService.clean_old_analytics(test_db, days_old=90)
     assert deleted >= 5
 
 
 @pytest.mark.asyncio
-async def test_get_challenge_videos(db: AsyncSession):
+async def test_get_challenge_videos(test_db: AsyncSession):
     """Test getting videos for a challenge"""
     # Create challenge
     challenge = Challenge(
@@ -312,19 +315,19 @@ async def test_get_challenge_videos(db: AsyncSession):
         start_date=datetime.utcnow(),
         end_date=datetime.utcnow() + timedelta(days=7),
     )
-    db.add(challenge)
-    await db.commit()
+    test_db.add(challenge)
+    await test_db.commit()
 
     # Get challenge videos
     videos, total = await HashtagService.get_challenge_videos(
-        db, challenge.id, limit=30, offset=0
+        test_db, challenge.id, limit=30, offset=0
     )
     assert isinstance(videos, list)
     assert isinstance(total, int)
 
 
 @pytest.mark.asyncio
-async def test_hashtag_by_region(db: AsyncSession):
+async def test_hashtag_by_region(test_db: AsyncSession):
     """Test hashtag trending by region"""
     # Create hashtags in different regions
     us_hashtag = HashtagTrend(
@@ -339,21 +342,21 @@ async def test_hashtag_by_region(db: AsyncSession):
         usage_count=500,
         rank_position=1,
     )
-    db.add(us_hashtag)
-    db.add(uk_hashtag)
-    await db.commit()
+    test_db.add(us_hashtag)
+    test_db.add(uk_hashtag)
+    await test_db.commit()
 
     # Get US trends
-    us_trends = await HashtagService.get_trending_hashtags(db, region="US")
+    us_trends = await HashtagService.get_trending_hashtags(test_db, region="US")
     # Get UK trends
-    uk_trends = await HashtagService.get_trending_hashtags(db, region="UK")
+    uk_trends = await HashtagService.get_trending_hashtags(test_db, region="UK")
 
     assert len(us_trends) > 0
     assert len(uk_trends) > 0
 
 
 @pytest.mark.asyncio
-async def test_hashtag_trending_velocity(db: AsyncSession):
+async def test_hashtag_trending_velocity(test_db: AsyncSession):
     """Test trend velocity calculation"""
     hashtag = "viral"
     region = "US"
@@ -364,7 +367,7 @@ async def test_hashtag_trending_velocity(db: AsyncSession):
         region=region,
         usage_count=1000,
     )
-    db.add(trend)
+    test_db.add(trend)
 
     # Create analytics showing growth
     base_date = datetime.utcnow()
@@ -376,18 +379,18 @@ async def test_hashtag_trending_velocity(db: AsyncSession):
             usage_count=100 + (day * 30),
             unique_creators=10 + day,
         )
-        db.add(analytics)
+        test_db.add(analytics)
 
-    await db.commit()
+    await test_db.commit()
 
     # Calculate metrics
-    metrics = await HashtagService.calculate_trend_metrics(db, hashtag, region)
+    metrics = await HashtagService.calculate_trend_metrics(test_db, hashtag, region)
     # Positive velocity indicates growth
     assert "trend_velocity" in metrics
 
 
 @pytest.mark.asyncio
-async def test_hashtag_unique_creators(db: AsyncSession):
+async def test_hashtag_unique_creators(test_db: AsyncSession):
     """Test tracking unique creators per hashtag"""
     hashtag = "music"
     region = "US"
@@ -398,16 +401,16 @@ async def test_hashtag_unique_creators(db: AsyncSession):
         usage_count=100,
         unique_creators=50,
     )
-    db.add(trend)
-    await db.commit()
+    test_db.add(trend)
+    await test_db.commit()
 
     # Get stats
-    stats = await HashtagService.get_hashtag_stats(db, hashtag, region)
+    stats = await HashtagService.get_hashtag_stats(test_db, hashtag, region)
     assert stats["unique_creators"] == 50
 
 
 @pytest.mark.asyncio
-async def test_hashtag_analytics_daily_tracking(db: AsyncSession):
+async def test_hashtag_analytics_daily_tracking(test_db: AsyncSession):
     """Test daily analytics tracking"""
     hashtag = "daily"
 
@@ -420,17 +423,17 @@ async def test_hashtag_analytics_daily_tracking(db: AsyncSession):
             usage_count=100 * (day + 1),
             unique_creators=10 * (day + 1),
         )
-        db.add(analytics)
+        test_db.add(analytics)
 
-    await db.commit()
+    await test_db.commit()
 
     # Get 7-day analytics
-    results = await HashtagService.get_hashtag_analytics(db, hashtag, days=7)
+    results = await HashtagService.get_hashtag_analytics(test_db, hashtag, days=7)
     assert len(results) == 7
 
 
 @pytest.mark.asyncio
-async def test_challenge_participation_count(db: AsyncSession):
+async def test_challenge_participation_count(test_db: AsyncSession):
     """Test challenge participation tracking"""
     challenge = Challenge(
         hashtag="contest",
@@ -439,22 +442,22 @@ async def test_challenge_participation_count(db: AsyncSession):
         end_date=datetime.utcnow() + timedelta(days=30),
         participation_count=0,
     )
-    db.add(challenge)
-    await db.commit()
+    test_db.add(challenge)
+    await test_db.commit()
 
     # Update participation 5 times
     for _ in range(5):
         video_id = UUID("00000000-0000-0000-0000-000000000001")
-        await HashtagService.update_challenge_stats(db, challenge.id, video_id)
+        await HashtagService.update_challenge_stats(test_db, challenge.id, video_id)
 
     # Verify count
-    updated = await db.get(Challenge, challenge.id)
+    updated = await test_db.get(Challenge, challenge.id)
     assert updated.participation_count >= 5
 
 
 @pytest.mark.asyncio
-async def test_hashtag_none_returns_empty(db: AsyncSession):
+async def test_hashtag_none_returns_empty(test_db: AsyncSession):
     """Test that non-existent hashtag returns empty stats"""
-    stats = await HashtagService.get_hashtag_stats(db, "nonexistent", "US")
+    stats = await HashtagService.get_hashtag_stats(test_db, "nonexistent", "US")
     assert stats["usage_count"] == 0
     assert stats["popularity_score"] == 0

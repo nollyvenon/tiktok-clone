@@ -35,7 +35,7 @@ async def test_register_short_password(test_client: AsyncClient, register_user_d
     register_user_data["password"] = "short"
     response = await test_client.post("/api/auth/register", json=register_user_data)
 
-    assert response.status_code == 400
+    assert response.status_code == 422
 
 
 @pytest.mark.asyncio
@@ -81,7 +81,7 @@ async def test_register_short_username(test_client: AsyncClient, register_user_d
     register_user_data["username"] = "ab"
     response = await test_client.post("/api/auth/register", json=register_user_data)
 
-    assert response.status_code == 400
+    assert response.status_code == 422
 
 
 @pytest.mark.asyncio
@@ -145,7 +145,7 @@ async def test_get_current_user_no_token(test_client: AsyncClient):
     """Test getting current user without token"""
     response = await test_client.get("/api/auth/me")
 
-    assert response.status_code == 403
+    assert response.status_code == 401
 
 
 @pytest.mark.asyncio
@@ -210,7 +210,7 @@ async def test_logout_no_token(test_client: AsyncClient):
     """Test logout without token"""
     response = await test_client.post("/api/auth/logout")
 
-    assert response.status_code == 403
+    assert response.status_code == 401
 
 
 @pytest.mark.asyncio

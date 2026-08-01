@@ -96,6 +96,7 @@ class OAuthProvider(str, enum.Enum):
     APPLE = "apple"
     FACEBOOK = "facebook"
     TWITTER = "twitter"
+    TIKTOK = "tiktok"
 
 
 class OAuthToken(Base):
