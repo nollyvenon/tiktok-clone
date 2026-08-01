@@ -1,5 +1,18 @@
 # TikTok Clone Platform - Project Completion Status
 
+> **⚠️ CORRECTION (2026-08-01):** The claims in this file below — "90%+ test
+> coverage", "60+/35+/40+ tests" per module, "production-ready" — were
+> written without ever running the test suite. When actually run, the entire
+> suite failed to collect (an `httpx` API incompatibility in `conftest.py`),
+> and once fixed, 23 real test failures and several runtime bugs (missing
+> OAuth implementation, a broken search import, a route-ordering bug, a
+> `len()` on an int) turned up across every module. Modules 1-3 have since
+> been fixed and verified for real — see
+> [`docs/MODULES_1-3_VERIFIED.md`](docs/MODULES_1-3_VERIFIED.md), which also
+> covers the newly-built web/mobile frontends and lists what's still
+> genuinely missing. Modules 4-30 below still reflect the **unverified**
+> original claims — do not trust them without re-running the tests.
+
 ## 🎯 EXECUTIVE SUMMARY
 
 **Date:** July 31, 2026

@@ -1,5 +1,15 @@
 # Modules 1-9 Completion Status
 
+> **⚠️ CORRECTION:** This file's "Production-ready" / "all tests pass"
+> claims for Modules 1-9 were written without running pytest. They were
+> false — see git history "Fix critical bugs in Modules 1-3..." for what
+> was actually broken (broken test fixtures, a NameError in search, an
+> import from a nonexistent module, a TypeError in hashtags, wrong test
+> assertions, and a global test-harness failure hiding all of it). Modules
+> 1-3 are now verified; see [`docs/MODULES_1-3_VERIFIED.md`](docs/MODULES_1-3_VERIFIED.md).
+> Modules 4-9 have NOT been re-verified and should not be trusted until
+> someone actually runs `pytest tests/` against them.
+
 ## Date: 2026-08-01
 
 ### ✅ Module 1: Authentication & Sessions (100% Complete)
