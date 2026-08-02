@@ -733,35 +733,54 @@ export const notificationApi = {
 };
 
 // Message endpoints
+export interface ConversationListResult {
+  conversations: Conversation[];
+  total: number;
+}
+
+export interface MessageListResult {
+  messages: Message[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
 export const messageApi = {
-  getConversations: async (cursor?: string) => {
-    const res = await client.get<{ data: Conversation[]; cursor?: string }>(
-      '/api/messages/conversations',
-      { params: { cursor } }
-    );
+  getConversations: async (limit = 20, offset = 0) => {
+    const res = await client.get<ConversationListResult>('/api/messages/conversations', {
+      params: { limit, offset },
+    });
     return res.data;
   },
 
-  getMessages: async (conversationId: string, cursor?: string) => {
-    const res = await client.get<{ data: Message[]; cursor?: string }>(
-      `/api/conversations/${conversationId}/messages`,
-      { params: { cursor } }
+  startConversation: async (recipientId: string) => {
+    const res = await client.post<Conversation>('/api/messages/conversations', null, {
+      params: { recipient_id: recipientId },
+    });
+    return res.data;
+  },
+
+  getMessages: async (conversationId: string, limit = 30, offset = 0) => {
+    const res = await client.get<MessageListResult>(
+      `/api/messages/conversations/${conversationId}/messages`,
+      { params: { limit, offset } }
     );
     return res.data;
   },
 
   sendMessage: async (conversationId: string, content: string) => {
-    const res = await client.post<{ data: Message }>(`/api/conversations/${conversationId}/messages`, {
-      content,
-    });
-    return res.data.data;
+    const res = await client.post<Message>(
+      `/api/messages/conversations/${conversationId}/messages`,
+      { content }
+    );
+    return res.data;
   },
 
-  startConversation: async (userId: string) => {
-    const res = await client.post<{ data: Conversation }>('/api/messages/conversations', {
-      participantId: userId,
-    });
-    return res.data.data;
+  markRead: async (conversationId: string) => {
+    const res = await client.put<{ count: number }>(
+      `/api/messages/conversations/${conversationId}/read`
+    );
+    return res.data;
   },
 };
 

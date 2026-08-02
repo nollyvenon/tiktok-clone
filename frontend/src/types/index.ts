@@ -106,21 +106,19 @@ export interface Notification {
 // Message types
 export interface Message {
   id: string;
-  conversationId: string;
-  senderId: string;
+  conversation_id: string;
+  sender_id: string;
   content: string;
-  mediaUrl?: string;
-  isRead: boolean;
-  readAt?: string;
-  createdAt: string;
+  is_read: boolean;
+  created_at: string;
 }
 
 export interface Conversation {
   id: string;
-  participants: User[];
-  lastMessage?: Message;
-  lastMessageAt: string;
-  unreadCount: number;
+  other_user: PublicUser;
+  last_message: Message | null;
+  unread_count: number;
+  updated_at: string;
 }
 
 // API Response types

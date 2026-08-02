@@ -86,6 +86,15 @@ export function Navbar() {
 
           {/* Right Actions */}
           <div className="flex items-center gap-4">
+            {/* Messages */}
+            <Link
+              href="/messages"
+              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition"
+              title="Messages"
+            >
+              <MessageCircle className="w-5 h-5" />
+            </Link>
+
             {/* Notifications */}
             <Link
               href="/notifications"

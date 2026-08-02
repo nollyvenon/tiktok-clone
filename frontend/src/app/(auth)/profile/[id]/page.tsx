@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { useQuery, useMutation } from 'react-query';
 import Link from 'next/link';
-import { profileApi, videoApi } from '@/lib/api';
+import { useRouter } from 'next/navigation';
+import { profileApi, videoApi, messageApi } from '@/lib/api';
 import { VideoCard } from '@/components/features/VideoCard';
 import { Loader2, AlertCircle, MessageCircle, SlidersHorizontal, MoreVertical, Ban } from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
@@ -13,6 +14,7 @@ interface ProfilePageProps {
 }
 
 export default function ProfilePage({ params }: ProfilePageProps) {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<'videos' | 'likes'>('videos');
   const [showMenu, setShowMenu] = useState(false);
   const { user: currentUser } = useAuthStore();
@@ -29,6 +31,12 @@ export default function ProfilePage({ params }: ProfilePageProps) {
   );
 
   const followMutation = useMutation(() => profileApi.followUser(params.id));
+
+  const messageMutation = useMutation(() => messageApi.startConversation(params.id), {
+    onSuccess: (conversation) => {
+      router.push(`/messages/${conversation.id}`);
+    },
+  });
 
   const blockMutation = useMutation(() => profileApi.blockUser(params.id), {
     onSuccess: () => {
@@ -113,7 +121,11 @@ export default function ProfilePage({ params }: ProfilePageProps) {
               >
                 {isFollowing ? 'Following' : 'Follow'}
               </button>
-              <button className="p-2 rounded-full border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800">
+              <button
+                onClick={() => messageMutation.mutate()}
+                disabled={messageMutation.isLoading || isBlocked}
+                className="p-2 rounded-full border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50"
+              >
                 <MessageCircle className="w-5 h-5" />
               </button>
               <button
