@@ -4,6 +4,7 @@ import '../../models/video.dart';
 import '../../services/feed_service.dart';
 import '../../services/notification_service.dart';
 import '../../widgets/video_player_item.dart';
+import '../../widgets/comments_sheet.dart';
 import '../notifications/notifications_screen.dart';
 import '../profile/profile_screen.dart';
 
@@ -174,6 +175,14 @@ class _FeedScreenState extends State<FeedScreen> {
                       video: video,
                       onLike: () => _toggleLike(index),
                       onBookmark: () => _toggleBookmark(index),
+                      onComment: () => CommentsSheet.show(
+                        context,
+                        videoId: video.id,
+                        videoOwnerId: video.author.id,
+                        onCommentCountChanged: (delta) {
+                          setState(() => video.commentsCount += delta);
+                        },
+                      ),
                     ),
                   ),
                 ],
@@ -253,8 +262,14 @@ class _EngagementBar extends StatelessWidget {
   final Video video;
   final VoidCallback onLike;
   final VoidCallback onBookmark;
+  final VoidCallback onComment;
 
-  const _EngagementBar({required this.video, required this.onLike, required this.onBookmark});
+  const _EngagementBar({
+    required this.video,
+    required this.onLike,
+    required this.onBookmark,
+    required this.onComment,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -278,7 +293,7 @@ class _EngagementBar extends StatelessWidget {
           icon: Icons.comment,
           color: Colors.white,
           label: '${video.commentsCount}',
-          onTap: () {},
+          onTap: onComment,
         ),
         const SizedBox(height: 20),
         _ActionIcon(

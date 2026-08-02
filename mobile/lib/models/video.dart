@@ -37,7 +37,7 @@ class Video {
   final bool isPublic;
   final int viewsCount;
   int likesCount;
-  final int commentsCount;
+  int commentsCount;
   final int sharesCount;
   int bookmarksCount;
   bool isLiked;
