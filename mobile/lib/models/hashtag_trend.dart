@@ -34,6 +34,7 @@ class Challenge {
   final String? description;
   final int? prizePool;
   final int participationCount;
+  final bool isActive;
 
   Challenge({
     required this.id,
@@ -42,6 +43,7 @@ class Challenge {
     this.description,
     this.prizePool,
     required this.participationCount,
+    required this.isActive,
   });
 
   factory Challenge.fromJson(Map<String, dynamic> json) {
@@ -52,6 +54,7 @@ class Challenge {
       description: json['description'] as String?,
       prizePool: json['prize_pool'] as int?,
       participationCount: json['participation_count'] as int,
+      isActive: json['is_active'] as bool? ?? true,
     );
   }
 }

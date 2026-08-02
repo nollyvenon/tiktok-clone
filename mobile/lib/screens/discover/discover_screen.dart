@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../models/hashtag_trend.dart';
 import '../../services/hashtag_service.dart';
+import 'challenge_detail_screen.dart';
+import 'hashtag_analytics_screen.dart';
 
 class DiscoverScreen extends StatefulWidget {
   const DiscoverScreen({super.key});
@@ -79,6 +81,11 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                                         style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.amber),
                                       )
                                     : Text('${challenge.participationCount} entries'),
+                                onTap: () => Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => ChallengeDetailScreen(challengeId: challenge.id),
+                                  ),
+                                ),
                               ),
                             )),
                       const SizedBox(height: 24),
@@ -112,6 +119,11 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                                     ],
                                   )
                                 : null,
+                            onTap: () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => HashtagAnalyticsScreen(hashtag: trend.hashtag),
+                              ),
+                            ),
                           );
                         }),
                     ],
