@@ -58,6 +58,20 @@ class FeedService {
     }
   }
 
+  Future<List<Video>> getBookmarkedVideos({int limit = 20, int offset = 0}) async {
+    try {
+      final response = await _dio.get('/api/videos/bookmarks', queryParameters: {
+        'limit': limit,
+        'offset': offset,
+      });
+      return (response.data['videos'] as List)
+          .map((e) => Video.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } on DioException catch (e) {
+      throw ApiException(_extractError(e, 'Failed to load bookmarks'));
+    }
+  }
+
   Future<List<Video>> searchVideos(String query, {int limit = 20, int offset = 0}) async {
     try {
       final response = await _dio.get('/api/videos/search', queryParameters: {

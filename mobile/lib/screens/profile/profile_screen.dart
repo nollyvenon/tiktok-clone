@@ -5,6 +5,7 @@ import '../../models/profile.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/profile_service.dart';
 import '../settings/preferences_screen.dart';
+import '../bookmarks/bookmarks_screen.dart';
 import 'edit_profile_screen.dart';
 import 'follow_list_screen.dart';
 
@@ -107,6 +108,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
         title: Text(_profile?.user.username ?? 'Profile'),
         actions: [
           if (_isOwnProfile) ...[
+            IconButton(
+              icon: const Icon(Icons.bookmark_border),
+              tooltip: 'Saved Videos',
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const BookmarksScreen()),
+              ),
+            ),
             IconButton(
               icon: const Icon(Icons.tune),
               tooltip: 'For You Preferences',
