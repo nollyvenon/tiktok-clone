@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 
 import '../models/video.dart';
+import '../models/dashboard.dart';
 import 'api_client.dart';
 import 'auth_service.dart';
 
@@ -69,6 +70,17 @@ class FeedService {
           .toList();
     } on DioException catch (e) {
       throw ApiException(_extractError(e, 'Failed to load bookmarks'));
+    }
+  }
+
+  Future<CreatorDashboard> getDashboard({int topVideosLimit = 5}) async {
+    try {
+      final response = await _dio.get('/api/videos/dashboard', queryParameters: {
+        'top_videos_limit': topVideosLimit,
+      });
+      return CreatorDashboard.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw ApiException(_extractError(e, 'Failed to load dashboard'));
     }
   }
 

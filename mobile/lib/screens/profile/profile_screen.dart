@@ -6,6 +6,7 @@ import '../../providers/auth_provider.dart';
 import '../../services/profile_service.dart';
 import '../settings/preferences_screen.dart';
 import '../bookmarks/bookmarks_screen.dart';
+import '../dashboard/dashboard_screen.dart';
 import '../messages/messages_screen.dart';
 import '../messages/chat_detail_screen.dart';
 import '../../services/message_service.dart';
@@ -148,6 +149,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
               tooltip: 'Saved Videos',
               onPressed: () => Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const BookmarksScreen()),
+              ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.bar_chart),
+              tooltip: 'Creator Dashboard',
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const DashboardScreen()),
               ),
             ),
             IconButton(
