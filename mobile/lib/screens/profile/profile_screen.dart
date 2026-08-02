@@ -6,6 +6,9 @@ import '../../providers/auth_provider.dart';
 import '../../services/profile_service.dart';
 import '../settings/preferences_screen.dart';
 import '../bookmarks/bookmarks_screen.dart';
+import '../messages/messages_screen.dart';
+import '../messages/chat_detail_screen.dart';
+import '../../services/message_service.dart';
 import 'edit_profile_screen.dart';
 import 'follow_list_screen.dart';
 
@@ -20,9 +23,11 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   final _profileService = ProfileService();
+  final _messageService = MessageService();
   ProfileDetail? _profile;
   bool _isLoading = true;
   bool _isFollowActionPending = false;
+  bool _isMessageActionPending = false;
   String? _error;
 
   bool get _isOwnProfile {
@@ -51,6 +56,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
       setState(() => _error = e.toString());
     } finally {
       setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _startConversation() async {
+    if (_profile == null) return;
+    setState(() => _isMessageActionPending = true);
+    try {
+      final conversation = await _messageService.startConversation(_profile!.user.id);
+      if (!mounted) return;
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => ChatDetailScreen(
+            conversationId: conversation.id,
+            otherUsername: conversation.otherUser.username,
+          ),
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      }
+    } finally {
+      if (mounted) setState(() => _isMessageActionPending = false);
     }
   }
 
@@ -108,6 +136,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
         title: Text(_profile?.user.username ?? 'Profile'),
         actions: [
           if (_isOwnProfile) ...[
+            IconButton(
+              icon: const Icon(Icons.chat_bubble_outline),
+              tooltip: 'Messages',
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const MessagesScreen()),
+              ),
+            ),
             IconButton(
               icon: const Icon(Icons.bookmark_border),
               tooltip: 'Saved Videos',
@@ -205,27 +240,52 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ],
         ),
         const SizedBox(height: 20),
-        SizedBox(
-          height: 44,
-          child: _isOwnProfile
-              ? OutlinedButton(
-                  onPressed: () async {
-                    await Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => EditProfileScreen(user: profile.user)),
-                    );
-                    _loadProfile();
-                  },
-                  child: const Text('Edit profile'),
-                )
-              : ElevatedButton(
-                  onPressed: _isFollowActionPending ? null : _toggleFollow,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: profile.isFollowing ? Colors.grey.shade300 : Colors.pink,
-                    foregroundColor: profile.isFollowing ? Colors.black : Colors.white,
+        if (_isOwnProfile)
+          SizedBox(
+            height: 44,
+            child: OutlinedButton(
+              onPressed: () async {
+                await Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => EditProfileScreen(user: profile.user)),
+                );
+                _loadProfile();
+              },
+              child: const Text('Edit profile'),
+            ),
+          )
+        else
+          Row(
+            children: [
+              Expanded(
+                child: SizedBox(
+                  height: 44,
+                  child: ElevatedButton(
+                    onPressed: _isFollowActionPending || profile.isBlocked ? null : _toggleFollow,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: profile.isFollowing ? Colors.grey.shade300 : Colors.pink,
+                      foregroundColor: profile.isFollowing ? Colors.black : Colors.white,
+                    ),
+                    child: Text(profile.isFollowing ? 'Following' : 'Follow'),
                   ),
-                  child: Text(profile.isFollowing ? 'Following' : 'Follow'),
                 ),
-        ),
+              ),
+              const SizedBox(width: 8),
+              SizedBox(
+                height: 44,
+                width: 44,
+                child: OutlinedButton(
+                  onPressed: _isMessageActionPending || profile.isBlocked ? null : _startConversation,
+                  style: OutlinedButton.styleFrom(padding: EdgeInsets.zero),
+                  child: const Icon(Icons.chat_bubble_outline, size: 18),
+                ),
+              ),
+            ],
+          ),
+        if (profile.isBlocked && !_isOwnProfile)
+          const Padding(
+            padding: EdgeInsets.only(top: 8),
+            child: Text('You have blocked this user.', style: TextStyle(color: Colors.red, fontSize: 12)),
+          ),
       ],
     );
   }
