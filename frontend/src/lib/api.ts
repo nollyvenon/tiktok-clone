@@ -1104,4 +1104,85 @@ export const moderationApi = {
   },
 };
 
+export interface AdminStats {
+  total_users: number;
+  active_users: number;
+  suspended_users: number;
+  total_videos: number;
+  total_comments: number;
+  pending_reports: number;
+  actioned_reports: number;
+  dismissed_reports: number;
+}
+
+export interface AdminUserSummary {
+  id: string;
+  email: string;
+  username: string;
+  avatar_url: string | null;
+  is_active: boolean;
+  is_verified: boolean;
+  is_creator: boolean;
+  role: 'user' | 'creator' | 'admin';
+  created_at: string;
+  last_login: string | null;
+}
+
+export interface AdminUserListResult {
+  users: AdminUserSummary[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface AdminAuditLogEntry {
+  id: string;
+  report_id: string;
+  moderator_id: string;
+  moderator_username: string;
+  action: ModerationActionType;
+  notes: string | null;
+  report_content_type: ReportedContentType;
+  report_reason: ReportReason;
+  created_at: string;
+}
+
+export interface AdminAuditLogResult {
+  entries: AdminAuditLogEntry[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export const adminApi = {
+  getStats: async () => {
+    const res = await client.get<AdminStats>('/api/admin/stats');
+    return res.data;
+  },
+
+  getUsers: async (search?: string, limit = 20, offset = 0) => {
+    const res = await client.get<AdminUserListResult>('/api/admin/users', {
+      params: { search, limit, offset },
+    });
+    return res.data;
+  },
+
+  suspendUser: async (userId: string) => {
+    const res = await client.post<AdminUserSummary>(`/api/admin/users/${userId}/suspend`);
+    return res.data;
+  },
+
+  reactivateUser: async (userId: string) => {
+    const res = await client.post<AdminUserSummary>(`/api/admin/users/${userId}/reactivate`);
+    return res.data;
+  },
+
+  getAuditLog: async (limit = 20, offset = 0) => {
+    const res = await client.get<AdminAuditLogResult>('/api/admin/audit-log', {
+      params: { limit, offset },
+    });
+    return res.data;
+  },
+};
+
 export default client;

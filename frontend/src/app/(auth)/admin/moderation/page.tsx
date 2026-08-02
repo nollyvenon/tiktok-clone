@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
 import { moderationApi, type ReportStatus, type ModerationActionType } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
+import AdminNav from '@/components/features/AdminNav';
 import { Loader2, AlertCircle, ShieldAlert } from 'lucide-react';
 
 const ACTIONS: { value: ModerationActionType; label: string; danger?: boolean }[] = [
@@ -54,8 +55,10 @@ export default function ModerationQueuePage() {
       <div className="max-w-3xl mx-auto px-4">
         <h1 className="text-2xl font-bold mb-6 flex items-center gap-2">
           <ShieldAlert className="w-6 h-6 text-pink-600" />
-          Moderation Queue
+          Admin Dashboard
         </h1>
+
+        <AdminNav />
 
         <div className="flex gap-2 mb-6">
           {(['pending', 'actioned', 'dismissed'] as ReportStatus[]).map((s) => (
