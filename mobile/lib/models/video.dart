@@ -24,6 +24,22 @@ class VideoAuthor {
   }
 }
 
+class MusicPreview {
+  final String id;
+  final String soundTitle;
+  final String? artist;
+
+  MusicPreview({required this.id, required this.soundTitle, this.artist});
+
+  factory MusicPreview.fromJson(Map<String, dynamic> json) {
+    return MusicPreview(
+      id: json['id'] as String,
+      soundTitle: json['sound_title'] as String,
+      artist: json['artist'] as String?,
+    );
+  }
+}
+
 class OriginalVideoPreview {
   final String id;
   final String? title;
@@ -70,6 +86,7 @@ class Video {
   final bool allowStitches;
   final String? remixType;
   final OriginalVideoPreview? originalVideo;
+  final MusicPreview? music;
 
   Video({
     required this.id,
@@ -94,6 +111,7 @@ class Video {
     this.allowStitches = true,
     this.remixType,
     this.originalVideo,
+    this.music,
   });
 
   factory Video.fromJson(Map<String, dynamic> json) {
@@ -121,6 +139,9 @@ class Video {
       remixType: json['remix_type'] as String?,
       originalVideo: json['original_video'] != null
           ? OriginalVideoPreview.fromJson(json['original_video'] as Map<String, dynamic>)
+          : null,
+      music: json['music'] != null
+          ? MusicPreview.fromJson(json['music'] as Map<String, dynamic>)
           : null,
     );
   }

@@ -284,6 +284,24 @@ class _VideoInfo extends StatelessWidget {
               style: const TextStyle(color: Colors.white70, fontSize: 13),
             ),
           ],
+          if (video.music != null) ...[
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                const Icon(Icons.music_note, color: Colors.white70, size: 14),
+                const SizedBox(width: 4),
+                Flexible(
+                  child: Text(
+                    video.music!.artist != null
+                        ? '${video.music!.soundTitle} – ${video.music!.artist}'
+                        : video.music!.soundTitle,
+                    style: const TextStyle(color: Colors.white70, fontSize: 13),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );

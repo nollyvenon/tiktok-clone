@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../models/editor_state.dart';
 import '../../services/ai_service.dart';
 import '../../services/editor_service.dart';
+import '../../services/upload_service.dart';
 
 const _effects = ['blur', 'brighten', 'saturate', 'desaturate', 'vintage', 'cinematic'];
 const _voices = [
@@ -24,6 +25,7 @@ class EditorScreen extends StatefulWidget {
 class _EditorScreenState extends State<EditorScreen> {
   final _editorService = EditorService();
   final _aiService = AIService();
+  final _uploadService = UploadService();
   EditorStateData? _state;
   bool _isLoading = true;
   String? _error;
@@ -34,6 +36,7 @@ class _EditorScreenState extends State<EditorScreen> {
   List<SoundRecommendation> _sounds = [];
   bool _soundsLoading = false;
   bool _soundsLoaded = false;
+  String? _selectedSoundId;
 
   @override
   void initState() {
@@ -51,11 +54,13 @@ class _EditorScreenState extends State<EditorScreen> {
       final stickerEntries = await Future.wait(
         state.segments.map((s) async => MapEntry(s.id, await _editorService.getStickers(s.id))),
       );
+      final draft = await _uploadService.getDraft(widget.draftId);
       setState(() {
         _state = state;
         _stickersBySegment
           ..clear()
           ..addEntries(stickerEntries);
+        _selectedSoundId = draft.musicId;
       });
     } catch (e) {
       setState(() => _error = e.toString());
@@ -175,6 +180,20 @@ class _EditorScreenState extends State<EditorScreen> {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
     } finally {
       setState(() => _soundsLoading = false);
+    }
+  }
+
+  Future<void> _useSound(String soundId) async {
+    try {
+      final draft = await _uploadService.getDraft(widget.draftId);
+      await _uploadService.updateDraft(widget.draftId, draft.copyWith(musicId: soundId));
+      setState(() => _selectedSoundId = soundId);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to attach sound: $e')),
+        );
+      }
     }
   }
 
@@ -494,12 +513,23 @@ class _EditorScreenState extends State<EditorScreen> {
                               contentPadding: EdgeInsets.zero,
                               title: Text(sound.soundTitle),
                               subtitle: sound.artist != null ? Text(sound.artist!) : null,
-                              trailing: sound.isTrending
-                                  ? const Text(
-                                      'Trending',
-                                      style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold, fontSize: 12),
-                                    )
-                                  : null,
+                              trailing: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (sound.isTrending)
+                                    const Padding(
+                                      padding: EdgeInsets.only(right: 8),
+                                      child: Text(
+                                        'Trending',
+                                        style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold, fontSize: 12),
+                                      ),
+                                    ),
+                                  TextButton(
+                                    onPressed: () => _useSound(sound.id),
+                                    child: Text(_selectedSoundId == sound.id ? 'Using' : 'Use'),
+                                  ),
+                                ],
+                              ),
                             )),
                     ],
                   ],

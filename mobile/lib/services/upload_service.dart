@@ -92,6 +92,27 @@ class UploadService {
     }
   }
 
+  Future<Draft> getDraft(String draftId) async {
+    try {
+      final response = await _dio.get('/api/uploads/drafts/$draftId');
+      return Draft.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw ApiException(_extractError(e, 'Failed to load draft'));
+    }
+  }
+
+  /// Full-replace update - the backend PUT expects the complete draft
+  /// body, not a partial patch, so callers should fetch the current draft
+  /// first and only change the field(s) they mean to update.
+  Future<Draft> updateDraft(String draftId, Draft draft) async {
+    try {
+      final response = await _dio.put('/api/uploads/drafts/$draftId', data: draft.toUpdateJson());
+      return Draft.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw ApiException(_extractError(e, 'Failed to update draft'));
+    }
+  }
+
   Future<List<Draft>> getUserDrafts({int limit = 20, int offset = 0}) async {
     try {
       final response = await _dio.get('/api/uploads/drafts', queryParameters: {
