@@ -13,13 +13,13 @@ from app.schemas import (
     VideoCreate, VideoUpdate, VideoResponse, VideoDetailResponse,
     FeedResponse, LikeResponse, BookmarkResponse, ViewTrackingRequest,
     VideoAnalytics, ErrorResponse, UserPublicProfile, OriginalVideoPreview,
-    CreatorDashboardResponse
+    CreatorDashboardResponse, MusicPreview
 )
 from app.services.videos import VideoService
 from app.services.profiles import ProfileService
 from app.services.notifications import NotificationService
 from app.routes.auth import get_current_user, get_optional_current_user
-from app.models import User, NotificationType, Video, RemixType
+from app.models import User, NotificationType, Video, RemixType, SoundRecommendation
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +40,16 @@ async def _build_original_video_preview(db: AsyncSession, video: Video) -> Optio
         thumbnail_url=original.thumbnail_url,
         user=UserPublicProfile.from_orm(original_user),
     )
+
+
+async def _build_music_preview(db: AsyncSession, video: Video) -> Optional[MusicPreview]:
+    """Builds the sound attribution preview for a video, if it has one attached"""
+    if video.music_id is None:
+        return None
+    sound = await db.get(SoundRecommendation, video.music_id)
+    if not sound:
+        return None
+    return MusicPreview(id=sound.id, sound_title=sound.sound_title, artist=sound.artist)
 
 
 # ============================================================================
@@ -114,6 +124,7 @@ async def get_feed(
                     allow_stitches=video.allow_stitches,
                     remix_type=video.remix_type,
                     original_video=await _build_original_video_preview(db, video),
+                    music=await _build_music_preview(db, video),
                 )
             )
 
@@ -198,6 +209,7 @@ async def get_trending(
                     allow_stitches=video.allow_stitches,
                     remix_type=video.remix_type,
                     original_video=await _build_original_video_preview(db, video),
+                    music=await _build_music_preview(db, video),
                 )
             )
 
@@ -272,6 +284,7 @@ async def search_videos(
                     allow_stitches=video.allow_stitches,
                     remix_type=video.remix_type,
                     original_video=await _build_original_video_preview(db, video),
+                    music=await _build_music_preview(db, video),
                 )
             )
 
@@ -371,6 +384,7 @@ async def get_bookmarked_videos(
                     allow_stitches=video.allow_stitches,
                     remix_type=video.remix_type,
                     original_video=await _build_original_video_preview(db, video),
+                    music=await _build_music_preview(db, video),
                 )
             )
 
@@ -447,6 +461,7 @@ async def get_video(
             allow_stitches=video.allow_stitches,
             remix_type=video.remix_type,
             original_video=await _build_original_video_preview(db, video),
+            music=await _build_music_preview(db, video),
         )
     except HTTPException:
         raise
@@ -522,6 +537,7 @@ async def get_user_videos(
                     allow_stitches=video.allow_stitches,
                     remix_type=video.remix_type,
                     original_video=await _build_original_video_preview(db, video),
+                    music=await _build_music_preview(db, video),
                 )
             )
 
@@ -859,6 +875,7 @@ async def get_remixes(
                     allow_stitches=video.allow_stitches,
                     remix_type=video.remix_type,
                     original_video=await _build_original_video_preview(db, video),
+                    music=await _build_music_preview(db, video),
                 )
             )
 

@@ -273,7 +273,7 @@ class Video(Base):
 
     # Metadata
     hashtags = Column(String(500), nullable=True)  # Comma-separated
-    music_id = Column(UUID(as_uuid=True), nullable=True)  # Reference to music/sound
+    music_id = Column(UUID(as_uuid=True), ForeignKey("sound_recommendations.id", ondelete="SET NULL"), nullable=True, index=True)
     location = Column(String(255), nullable=True)
 
     # Duets & Stitches: this video is a remix of original_video_id, of the
@@ -449,6 +449,10 @@ class Draft(Base):
     # Video, reused here rather than duplicated).
     original_video_id = Column(UUID(as_uuid=True), ForeignKey("videos.id", ondelete="SET NULL"), nullable=True)
     remix_type = Column(Enum(RemixType), nullable=True)
+
+    # Music Library: sound attached to this video (from sound_recommendations,
+    # which doubles as the shared library catalog)
+    music_id = Column(UUID(as_uuid=True), ForeignKey("sound_recommendations.id", ondelete="SET NULL"), nullable=True)
 
     # Status
     status = Column(Enum(DraftStatus), default=DraftStatus.EDITING, nullable=False, index=True)
@@ -708,12 +712,15 @@ class AutoCaption(Base):
 
 
 class SoundRecommendation(Base):
-    """AI-recommended sounds and music"""
+    """
+    Sounds/music in the shared library. Despite the historical name, this
+    doubles as the Music Library catalog - entries aren't tied to any one
+    draft, they're contributed to (and browsed from) a shared catalog.
+    """
     __tablename__ = "sound_recommendations"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    draft_id = Column(UUID(as_uuid=True), ForeignKey("drafts.id", ondelete="CASCADE"), nullable=False, index=True)
 
     # Sound details
     sound_url = Column(String(500), nullable=False)
@@ -739,7 +746,6 @@ class SoundRecommendation(Base):
 
     # Relationships
     user = relationship("User", backref="sound_recommendations")
-    draft = relationship("Draft", backref="sound_recommendations")
 
 
 class ColorCorrection(Base):

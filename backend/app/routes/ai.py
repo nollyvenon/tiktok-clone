@@ -13,14 +13,16 @@ from app.database import get_db
 from app.schemas import (
     BackgroundRemovalRequest, BackgroundRemovalResponse, VoiceoverRequest,
     VoiceoverResponse, AutoCaptionRequest, AutoCaptionResponse,
-    SoundRecommendationsListResponse, SoundRecommendationResponse,
+    SoundRecommendationsListResponse, SoundRecommendationResponse, SoundCreate,
     ColorCorrectionRequest, ColorCorrectionResponse, AutoFrameResponse,
     TrendSuggestionsListResponse, TrendSuggestionResponse,
     AIGenerationResponse, AICreditsResponse, AIOperationHistoryResponse,
-    ErrorResponse
+    ErrorResponse, FeedResponse, VideoDetailResponse, UserPublicProfile, MusicPreview,
 )
 from app.services.ai import AIService
 from app.services.uploads import UploadService
+from app.services.videos import VideoService
+from app.services.profiles import ProfileService
 from app.routes.auth import get_current_user
 from app.models import User, Segment, AIGeneration
 
@@ -464,6 +466,114 @@ async def get_trending_sounds(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to retrieve trending sounds",
+        )
+
+
+@router.post(
+    "/sounds",
+    response_model=SoundRecommendationResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_sound(
+    request: SoundCreate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Contribute a sound to the shared music/sound library
+
+    **Authorization:** Requires valid access token
+
+    Sounds added here are immediately browsable via
+    `/ai/sounds/recommendations` and `/ai/sounds/trending`, and can be
+    attached to a video draft via its `music_id` field.
+    """
+    try:
+        sound = await AIService.create_sound(
+            db,
+            current_user.id,
+            request.sound_url,
+            request.sound_title,
+            request.artist,
+            request.category,
+            request.mood,
+            request.genre,
+            request.region,
+            request.duration,
+            request.license_type,
+            request.credit_required,
+        )
+        return SoundRecommendationResponse.from_orm(sound)
+    except Exception as e:
+        logger.error(f"Create sound error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to add sound to library",
+        )
+
+
+@router.get(
+    "/sounds/{sound_id}/videos",
+    response_model=FeedResponse,
+    responses={404: {"model": ErrorResponse, "description": "Sound not found"}},
+)
+async def get_videos_using_sound(
+    sound_id: UUID,
+    limit: int = Query(20, ge=1, le=50),
+    offset: int = Query(0, ge=0),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get videos that used this sound, newest first"""
+    sound = await AIService.get_sound(db, sound_id)
+    if not sound:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sound not found")
+
+    try:
+        videos, total = await VideoService.get_videos_using_sound(db, sound_id, limit=limit, offset=offset)
+        music_preview = MusicPreview(id=sound.id, sound_title=sound.sound_title, artist=sound.artist)
+
+        video_responses = []
+        for video in videos:
+            user = await ProfileService.get_user_profile(db, video.user_id)
+            video_responses.append(
+                VideoDetailResponse(
+                    id=video.id,
+                    user_id=video.user_id,
+                    user=UserPublicProfile.from_orm(user),
+                    title=video.title,
+                    description=video.description,
+                    video_url=video.video_url,
+                    thumbnail_url=video.thumbnail_url,
+                    duration=video.duration,
+                    hashtags=video.hashtags,
+                    location=video.location,
+                    is_public=video.is_public,
+                    views_count=video.views_count,
+                    likes_count=video.likes_count,
+                    comments_count=video.comments_count,
+                    shares_count=video.shares_count,
+                    bookmarks_count=video.bookmarks_count,
+                    completion_rate=video.completion_rate,
+                    created_at=video.created_at,
+                    published_at=video.published_at,
+                    is_liked=False,
+                    is_bookmarked=False,
+                    allow_comments=video.allow_comments,
+                    allow_duets=video.allow_duets,
+                    allow_stitches=video.allow_stitches,
+                    remix_type=video.remix_type,
+                    music=music_preview,
+                )
+            )
+
+        return FeedResponse(videos=video_responses, total=total)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Get videos using sound error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve videos for this sound",
         )
 
 

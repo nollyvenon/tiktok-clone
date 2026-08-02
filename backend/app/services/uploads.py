@@ -10,7 +10,7 @@ from uuid import UUID
 import logging
 import os
 
-from app.models import Upload, Draft, Video, UploadStatus, DraftStatus, VideoStatus
+from app.models import Upload, Draft, Video, UploadStatus, DraftStatus, VideoStatus, SoundRecommendation
 from app.schemas import DraftCreate
 from app.services.videos import VideoService
 
@@ -19,6 +19,26 @@ logger = logging.getLogger(__name__)
 
 class UploadService:
     """Service for video upload and processing"""
+
+    @staticmethod
+    async def _validate_draft_references(db: AsyncSession, draft_data: DraftCreate) -> None:
+        """
+        Check that original_video_id/music_id (if set) reference real
+        rows before the draft is saved. Both columns are real foreign
+        keys, so a bogus ID would otherwise raise a raw IntegrityError at
+        save time instead of a clean, actionable error - full
+        permission/ownership validation for remixes still happens
+        separately at publish time via VideoService.validate_remix.
+        """
+        if draft_data.original_video_id is not None:
+            original = await db.get(Video, draft_data.original_video_id)
+            if not original:
+                raise ValueError("Original video not found")
+
+        if draft_data.music_id is not None:
+            sound = await db.get(SoundRecommendation, draft_data.music_id)
+            if not sound:
+                raise ValueError("Sound not found")
 
     @staticmethod
     async def create_upload(
@@ -159,6 +179,9 @@ class UploadService:
         Returns:
             Created draft
         """
+        if draft_data:
+            await UploadService._validate_draft_references(db, draft_data)
+
         draft = Draft(
             user_id=user_id,
             upload_id=upload_id,
@@ -177,6 +200,7 @@ class UploadService:
             draft.scheduled_publish_at = draft_data.scheduled_publish_at
             draft.original_video_id = draft_data.original_video_id
             draft.remix_type = draft_data.remix_type
+            draft.music_id = draft_data.music_id
 
         db.add(draft)
         await db.commit()
@@ -222,6 +246,8 @@ class UploadService:
         if draft.user_id != user_id:
             raise ValueError("Not authorized to update this draft")
 
+        await UploadService._validate_draft_references(db, draft_data)
+
         draft.title = draft_data.title
         draft.description = draft_data.description
         draft.hashtags = draft_data.hashtags
@@ -233,6 +259,7 @@ class UploadService:
         draft.scheduled_publish_at = draft_data.scheduled_publish_at
         draft.original_video_id = draft_data.original_video_id
         draft.remix_type = draft_data.remix_type
+        draft.music_id = draft_data.music_id
 
         await db.commit()
         await db.refresh(draft)
@@ -336,6 +363,7 @@ class UploadService:
         # time - the original creator may have disabled duets/stitches or
         # blocked this user in between.
         await VideoService.validate_remix(db, user_id, draft.original_video_id, draft.remix_type)
+        await VideoService.validate_music(db, draft.music_id)
 
         # Create video from draft
         video = Video(
@@ -352,6 +380,7 @@ class UploadService:
             allow_stitches=draft.allow_stitches,
             original_video_id=draft.original_video_id,
             remix_type=draft.remix_type,
+            music_id=draft.music_id,
             status=VideoStatus.PUBLISHED,
             published_at=datetime.utcnow(),
         )

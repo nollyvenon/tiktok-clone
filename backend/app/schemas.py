@@ -393,6 +393,16 @@ class OriginalVideoPreview(BaseModel):
         from_attributes = True
 
 
+class MusicPreview(BaseModel):
+    """Attribution preview for a video's attached sound/music"""
+    id: UUID
+    sound_title: str
+    artist: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
 class VideoDetailResponse(VideoResponse):
     """Detailed video response with user info"""
     user: UserPublicProfile
@@ -403,6 +413,7 @@ class VideoDetailResponse(VideoResponse):
     allow_stitches: bool
     remix_type: Optional[RemixType] = None
     original_video: Optional[OriginalVideoPreview] = None
+    music: Optional[MusicPreview] = None
 
     class Config:
         from_attributes = True
@@ -513,6 +524,8 @@ class DraftCreate(BaseModel):
     # the original creator can still revoke permission in between).
     original_video_id: Optional[UUID] = None
     remix_type: Optional[RemixType] = None
+    # Music Library: attach a sound from the library to this video
+    music_id: Optional[UUID] = None
 
 
 class DraftResponse(BaseModel):
@@ -529,6 +542,7 @@ class DraftResponse(BaseModel):
     allow_stitches: bool
     original_video_id: Optional[UUID] = None
     remix_type: Optional[RemixType] = None
+    music_id: Optional[UUID] = None
     status: str
     scheduled_publish_at: Optional[datetime] = None
     created_at: datetime
@@ -831,6 +845,20 @@ class SoundRecommendationsListResponse(BaseModel):
     total: int
     category: str
     region: str
+
+
+class SoundCreate(BaseModel):
+    """Contribute a sound to the shared library"""
+    sound_url: str = Field(..., max_length=500)
+    sound_title: str = Field(..., max_length=255)
+    artist: Optional[str] = Field(None, max_length=255)
+    category: str = Field(..., description="background, sound_effect, music, ambient")
+    mood: Optional[str] = None
+    genre: Optional[str] = None
+    region: str = "Global"
+    duration: Optional[int] = None
+    license_type: str = "royalty_free"
+    credit_required: Optional[str] = None
 
 
 class ColorCorrectionPreset(BaseModel):

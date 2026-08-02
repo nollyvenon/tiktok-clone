@@ -10,7 +10,7 @@ from uuid import UUID
 import logging
 import random
 
-from app.models import Video, Like, Bookmark, View, User, Follow, VideoStatus, RemixType
+from app.models import Video, Like, Bookmark, View, User, Follow, VideoStatus, RemixType, SoundRecommendation
 from app.schemas import (
     VideoCreate, VideoUpdate, VideoAnalytics, CreatorDashboardResponse, TopVideoSummary,
 )
@@ -61,6 +61,23 @@ class VideoService:
             raise ValueError("Cannot remix this video")
 
     @staticmethod
+    async def validate_music(db: AsyncSession, music_id: Optional[UUID]) -> None:
+        """
+        Shared validation for attaching a sound from the library to a
+        video, used by both the direct video-create path and the
+        draft-publish path.
+
+        Raises:
+            ValueError: If music_id is set but doesn't reference a real
+                library sound.
+        """
+        if music_id is None:
+            return
+        sound = await db.get(SoundRecommendation, music_id)
+        if not sound:
+            raise ValueError("Sound not found")
+
+    @staticmethod
     async def create_video(
         db: AsyncSession,
         user_id: UUID,
@@ -83,6 +100,7 @@ class VideoService:
         await VideoService.validate_remix(
             db, user_id, video_data.original_video_id, video_data.remix_type
         )
+        await VideoService.validate_music(db, video_data.music_id)
 
         video = Video(
             user_id=user_id,
@@ -507,6 +525,28 @@ class VideoService:
         ]
         if remix_type is not None:
             filters.append(Video.remix_type == remix_type)
+
+        count_result = await db.execute(select(func.count()).select_from(Video).where(and_(*filters)))
+        total = count_result.scalar() or 0
+
+        result = await db.execute(
+            select(Video).where(and_(*filters)).order_by(desc(Video.created_at)).offset(offset).limit(limit)
+        )
+        return list(result.scalars().all()), total
+
+    @staticmethod
+    async def get_videos_using_sound(
+        db: AsyncSession,
+        music_id: UUID,
+        limit: int = 20,
+        offset: int = 0,
+    ) -> Tuple[List[Video], int]:
+        """Get published videos that used a given sound, newest first"""
+        filters = [
+            Video.music_id == music_id,
+            Video.status == VideoStatus.PUBLISHED,
+            Video.is_public == True,
+        ]
 
         count_result = await db.execute(select(func.count()).select_from(Video).where(and_(*filters)))
         total = count_result.scalar() or 0

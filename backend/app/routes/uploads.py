@@ -254,6 +254,8 @@ async def create_draft(
         )
 
         return DraftResponse.from_orm(draft)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
         logger.error(f"Create draft error: {e}")
         raise HTTPException(

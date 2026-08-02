@@ -272,9 +272,11 @@ class AIService:
         region: str = "US",
         limit: int = 20,
     ) -> List[SoundRecommendation]:
-        """Get recommended sounds by category/mood"""
+        """Get recommended sounds by category/mood. Sounds contributed as
+        'Global' show up in every region's browse alongside region-specific
+        ones - otherwise a Global sound would never surface by default."""
         query = select(SoundRecommendation).where(
-            SoundRecommendation.region == region
+            SoundRecommendation.region.in_([region, "Global"])
         )
 
         if category:
@@ -299,7 +301,7 @@ class AIService:
             select(SoundRecommendation)
             .where(
                 and_(
-                    SoundRecommendation.region == region,
+                    SoundRecommendation.region.in_([region, "Global"]),
                     SoundRecommendation.is_trending == True,
                 )
             )
@@ -307,6 +309,45 @@ class AIService:
             .limit(limit)
         )
         return result.scalars().all()
+
+    @staticmethod
+    async def create_sound(
+        db: AsyncSession,
+        user_id: UUID,
+        sound_url: str,
+        sound_title: str,
+        artist: Optional[str],
+        category: str,
+        mood: Optional[str],
+        genre: Optional[str],
+        region: str,
+        duration: Optional[int],
+        license_type: str,
+        credit_required: Optional[str],
+    ) -> SoundRecommendation:
+        """Contribute a sound to the shared library"""
+        sound = SoundRecommendation(
+            user_id=user_id,
+            sound_url=sound_url,
+            sound_title=sound_title,
+            artist=artist,
+            category=category,
+            mood=mood,
+            genre=genre,
+            region=region,
+            duration=duration,
+            license_type=license_type,
+            credit_required=credit_required,
+        )
+        db.add(sound)
+        await db.commit()
+        await db.refresh(sound)
+        logger.info(f"Sound added to library: {sound.id} ({sound_title})")
+        return sound
+
+    @staticmethod
+    async def get_sound(db: AsyncSession, sound_id: UUID) -> Optional[SoundRecommendation]:
+        return await db.get(SoundRecommendation, sound_id)
 
     # ========================================================================
     # Color Correction
