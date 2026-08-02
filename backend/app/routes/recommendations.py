@@ -331,6 +331,8 @@ async def record_recommendation_feedback(
             "status": "recorded",
             "message": "Thank you for the feedback",
         }
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
         logger.error(f"Record feedback error: {e}")
         raise HTTPException(

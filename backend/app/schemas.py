@@ -452,6 +452,31 @@ class VideoAnalytics(BaseModel):
         from_attributes = True
 
 
+class TopVideoSummary(BaseModel):
+    """A single video's headline stats, for the creator dashboard's top-videos list"""
+    video_id: UUID
+    title: Optional[str] = None
+    thumbnail_url: Optional[str] = None
+    views: int
+    likes: int
+    comments: int
+    engagement_rate: float
+    published_at: Optional[datetime] = None
+
+
+class CreatorDashboardResponse(BaseModel):
+    """Aggregate analytics across all of the requesting user's videos"""
+    video_count: int
+    total_views: int
+    total_likes: int
+    total_comments: int
+    total_shares: int
+    total_bookmarks: int
+    average_engagement_rate: float
+    followers_count: int
+    top_videos: List[TopVideoSummary]
+
+
 # ============================================================================
 # Upload & Draft Schemas
 # ============================================================================

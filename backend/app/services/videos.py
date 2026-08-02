@@ -11,7 +11,9 @@ import logging
 import random
 
 from app.models import Video, Like, Bookmark, View, User, Follow, VideoStatus, RemixType
-from app.schemas import VideoCreate, VideoUpdate, VideoAnalytics
+from app.schemas import (
+    VideoCreate, VideoUpdate, VideoAnalytics, CreatorDashboardResponse, TopVideoSummary,
+)
 from app.services.profiles import ProfileService
 
 logger = logging.getLogger(__name__)
@@ -545,7 +547,7 @@ class VideoService:
 
         # Create view record
         view = View(
-            user_id=user_id or UUID(int=0),  # Use null UUID for anonymous
+            user_id=user_id,  # None for anonymous - the column is nullable
             video_id=video_id,
             watch_time=watch_time,
             completed=completed,
@@ -615,6 +617,67 @@ class VideoService:
             completion_rate=video.completion_rate,
             average_watch_time=video.average_watch_time,
             engagement_rate=round(engagement_rate, 2),
+        )
+
+    @staticmethod
+    async def get_creator_dashboard(
+        db: AsyncSession,
+        user_id: UUID,
+        top_videos_limit: int = 5,
+    ) -> CreatorDashboardResponse:
+        """
+        Aggregate analytics across all of a creator's own videos (not just
+        one at a time, which is all get_video_analytics ever supported).
+        Includes soft-deleted-excluded, but both public and private videos
+        - this is the owner's own dashboard, not a public-facing view.
+        """
+        result = await db.execute(
+            select(Video).where(
+                and_(Video.user_id == user_id, Video.deleted_at.is_(None))
+            )
+        )
+        videos = result.scalars().all()
+
+        total_views = sum(v.views_count for v in videos)
+        total_likes = sum(v.likes_count for v in videos)
+        total_comments = sum(v.comments_count for v in videos)
+        total_shares = sum(v.shares_count for v in videos)
+        total_bookmarks = sum(v.bookmarks_count for v in videos)
+
+        def engagement_rate(v: Video) -> float:
+            interactions = v.likes_count + v.comments_count + v.bookmarks_count
+            return (interactions / v.views_count * 100) if v.views_count > 0 else 0.0
+
+        average_engagement_rate = (
+            round(sum(engagement_rate(v) for v in videos) / len(videos), 2) if videos else 0.0
+        )
+
+        top_videos = sorted(videos, key=lambda v: v.views_count, reverse=True)[:top_videos_limit]
+
+        stats = await ProfileService.get_profile_statistics(db, user_id)
+
+        return CreatorDashboardResponse(
+            video_count=len(videos),
+            total_views=total_views,
+            total_likes=total_likes,
+            total_comments=total_comments,
+            total_shares=total_shares,
+            total_bookmarks=total_bookmarks,
+            average_engagement_rate=average_engagement_rate,
+            followers_count=stats.followers_count,
+            top_videos=[
+                TopVideoSummary(
+                    video_id=v.id,
+                    title=v.title,
+                    thumbnail_url=v.thumbnail_url,
+                    views=v.views_count,
+                    likes=v.likes_count,
+                    comments=v.comments_count,
+                    engagement_rate=round(engagement_rate(v), 2),
+                    published_at=v.published_at,
+                )
+                for v in top_videos
+            ],
         )
 
     @staticmethod

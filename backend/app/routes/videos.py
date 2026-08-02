@@ -12,7 +12,8 @@ from app.database import get_db
 from app.schemas import (
     VideoCreate, VideoUpdate, VideoResponse, VideoDetailResponse,
     FeedResponse, LikeResponse, BookmarkResponse, ViewTrackingRequest,
-    VideoAnalytics, ErrorResponse, UserPublicProfile, OriginalVideoPreview
+    VideoAnalytics, ErrorResponse, UserPublicProfile, OriginalVideoPreview,
+    CreatorDashboardResponse
 )
 from app.services.videos import VideoService
 from app.services.profiles import ProfileService
@@ -280,6 +281,37 @@ async def search_videos(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to search videos",
+        )
+
+
+@router.get(
+    "/dashboard",
+    response_model=CreatorDashboardResponse,
+    responses={
+        200: {"description": "Creator analytics dashboard"},
+        401: {"model": ErrorResponse, "description": "Unauthorized"},
+    },
+)
+async def get_creator_dashboard(
+    top_videos_limit: int = Query(5, ge=1, le=20),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Get aggregate analytics across all of the current user's own videos
+
+    **Authorization:** Requires valid access token - this is the owner's
+    own dashboard, not a public-facing view.
+    """
+    try:
+        return await VideoService.get_creator_dashboard(
+            db, current_user.id, top_videos_limit=top_videos_limit
+        )
+    except Exception as e:
+        logger.error(f"Get creator dashboard error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve dashboard",
         )
 
 

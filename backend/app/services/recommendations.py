@@ -343,7 +343,20 @@ class RecommendationService:
         rating: Optional[int] = None,
         reason: Optional[str] = None,
     ) -> RecommendationFeedback:
-        """Record user feedback on recommendation"""
+        """
+        Record user feedback on recommendation
+
+        Raises:
+            ValueError: If the recommendation doesn't exist - it previously
+                inserted feedback unconditionally, which meant a stale or
+                fabricated recommendation_id caused a raw ForeignKeyViolation
+                under Postgres (silently succeeded under SQLite's lax FK
+                enforcement in tests) instead of a clean 404.
+        """
+        recommendation = await db.get(Recommendation, recommendation_id)
+        if not recommendation:
+            raise ValueError("Recommendation not found")
+
         feedback = RecommendationFeedback(
             recommendation_id=recommendation_id,
             user_id=user_id,

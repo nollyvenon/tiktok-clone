@@ -299,6 +299,108 @@ async def test_bookmark_video(test_client: AsyncClient, register_user_data):
 
 
 @pytest.mark.asyncio
+async def test_get_creator_dashboard(test_client: AsyncClient, register_user_data):
+    creator_token, creator_id = await _register_and_login(
+        test_client, register_user_data, "dashboardcreator@example.com", "dashboardcreatoruser"
+    )
+    viewer_token, _ = await _register_and_login(
+        test_client, register_user_data, "dashboardviewer@example.com", "dashboardvieweruser"
+    )
+    await test_client.post(
+        f"/api/profiles/{creator_id}/follow", headers={"Authorization": f"Bearer {viewer_token}"}
+    )
+
+    video_a = await test_client.post(
+        "/api/videos",
+        json={"title": "Popular video", "video_url": "https://example.com/popular.mp4"},
+        headers={"Authorization": f"Bearer {creator_token}"},
+    )
+    video_b = await test_client.post(
+        "/api/videos",
+        json={"title": "Less popular", "video_url": "https://example.com/lesspopular.mp4"},
+        headers={"Authorization": f"Bearer {creator_token}"},
+    )
+
+    await test_client.post(
+        f"/api/videos/{video_a.json()['id']}/like", headers={"Authorization": f"Bearer {viewer_token}"}
+    )
+    await test_client.post(
+        f"/api/videos/{video_a.json()['id']}/view",
+        json={"watch_time": 10, "completed": True},
+        headers={"Authorization": f"Bearer {viewer_token}"},
+    )
+    await test_client.post(
+        f"/api/videos/{video_a.json()['id']}/view",
+        json={"watch_time": 10, "completed": True},
+        headers={"Authorization": f"Bearer {viewer_token}"},
+    )
+    await test_client.post(
+        f"/api/videos/{video_b.json()['id']}/view",
+        json={"watch_time": 5, "completed": False},
+        headers={"Authorization": f"Bearer {viewer_token}"},
+    )
+
+    response = await test_client.get(
+        "/api/videos/dashboard", headers={"Authorization": f"Bearer {creator_token}"}
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["video_count"] == 2
+    assert data["total_views"] == 3
+    assert data["total_likes"] == 1
+    assert data["followers_count"] == 1
+    assert data["top_videos"][0]["video_id"] == video_a.json()["id"]
+    assert data["top_videos"][0]["views"] == 2
+
+
+@pytest.mark.asyncio
+async def test_creator_dashboard_requires_auth(test_client: AsyncClient):
+    response = await test_client.get("/api/videos/dashboard")
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_creator_dashboard_empty_for_new_user(test_client: AsyncClient, register_user_data):
+    token, _ = await _register_and_login(
+        test_client, register_user_data, "emptydashboard@example.com", "emptydashboarduser"
+    )
+    response = await test_client.get("/api/videos/dashboard", headers={"Authorization": f"Bearer {token}"})
+    assert response.status_code == 200
+    data = response.json()
+    assert data["video_count"] == 0
+    assert data["total_views"] == 0
+    assert data["average_engagement_rate"] == 0
+    assert data["top_videos"] == []
+
+
+@pytest.mark.asyncio
+async def test_anonymous_view_tracking_does_not_violate_foreign_key(
+    test_client: AsyncClient, register_user_data
+):
+    """Regression test: track_view previously inserted a fabricated
+    all-zero UUID for anonymous views, referencing a user row that never
+    existed - silently fine under SQLite without FK enforcement, but a
+    guaranteed ForeignKeyViolation against real Postgres. The test
+    fixture now enables SQLite FK enforcement specifically to catch this
+    class of bug."""
+    token, _ = await _register_and_login(
+        test_client, register_user_data, "anonview@example.com", "anonviewuser"
+    )
+    create_response = await test_client.post(
+        "/api/videos",
+        json={"title": "Anon view test", "video_url": "https://example.com/anonview.mp4"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    video_id = create_response.json()["id"]
+
+    response = await test_client.post(
+        f"/api/videos/{video_id}/view",
+        json={"watch_time": 5, "completed": False},
+    )
+    assert response.status_code == 200
+
+
+@pytest.mark.asyncio
 async def test_get_bookmarked_videos(test_client: AsyncClient, register_user_data):
     access_token, _ = await _register_and_login(
         test_client, register_user_data, "bookmarklist1@example.com", "bookmarklist1user"

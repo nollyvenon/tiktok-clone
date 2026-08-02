@@ -6,6 +6,38 @@ import pytest
 from httpx import AsyncClient
 from uuid import uuid4, UUID
 
+from app.models import Recommendation, User, Video, VideoStatus
+
+
+async def _create_recommendation(test_client, test_db, register_user_data, email, username):
+    data = dict(register_user_data)
+    data["email"] = email
+    data["username"] = username
+    response = await test_client.post("/api/auth/register", json=data)
+    access_token = response.json()["access_token"]
+    user_id = UUID(response.json()["user"]["id"])
+
+    creator = User(email=f"creator_{username}@example.com", username=f"creator{username}", password_hash="x", is_active=True)
+    test_db.add(creator)
+    await test_db.commit()
+
+    video = Video(
+        user_id=creator.id,
+        title="Recommended",
+        video_url="https://example.com/rec.mp4",
+        status=VideoStatus.PUBLISHED,
+        is_public=True,
+    )
+    test_db.add(video)
+    await test_db.commit()
+
+    rec = Recommendation(user_id=user_id, video_id=video.id, score=0.9, algorithm="collaborative")
+    test_db.add(rec)
+    await test_db.commit()
+    await test_db.refresh(rec)
+
+    return access_token, rec.id
+
 
 @pytest.mark.asyncio
 async def test_get_for_you_feed(test_client: AsyncClient, register_user_data):
@@ -148,12 +180,11 @@ async def test_update_preferences_with_creators(test_client: AsyncClient, regist
 
 
 @pytest.mark.asyncio
-async def test_record_feedback_relevant(test_client: AsyncClient, register_user_data):
+async def test_record_feedback_relevant(test_client: AsyncClient, test_db, register_user_data):
     """Test recording relevant recommendation feedback"""
-    response = await test_client.post("/api/auth/register", json=register_user_data)
-    access_token = response.json()["access_token"]
-
-    recommendation_id = uuid4()
+    access_token, recommendation_id = await _create_recommendation(
+        test_client, test_db, register_user_data, "fbrelevant@example.com", "fbrelevantuser"
+    )
 
     response = await test_client.post(
         f"/api/recommendations/{recommendation_id}/feedback",
@@ -171,12 +202,11 @@ async def test_record_feedback_relevant(test_client: AsyncClient, register_user_
 
 
 @pytest.mark.asyncio
-async def test_record_feedback_irrelevant(test_client: AsyncClient, register_user_data):
+async def test_record_feedback_irrelevant(test_client: AsyncClient, test_db, register_user_data):
     """Test recording irrelevant feedback"""
-    response = await test_client.post("/api/auth/register", json=register_user_data)
-    access_token = response.json()["access_token"]
-
-    recommendation_id = uuid4()
+    access_token, recommendation_id = await _create_recommendation(
+        test_client, test_db, register_user_data, "fbirrelevant@example.com", "fbirrelevantuser"
+    )
 
     response = await test_client.post(
         f"/api/recommendations/{recommendation_id}/feedback",
@@ -190,12 +220,11 @@ async def test_record_feedback_irrelevant(test_client: AsyncClient, register_use
 
 
 @pytest.mark.asyncio
-async def test_record_feedback_not_interested(test_client: AsyncClient, register_user_data):
+async def test_record_feedback_not_interested(test_client: AsyncClient, test_db, register_user_data):
     """Test recording not interested feedback"""
-    response = await test_client.post("/api/auth/register", json=register_user_data)
-    access_token = response.json()["access_token"]
-
-    recommendation_id = uuid4()
+    access_token, recommendation_id = await _create_recommendation(
+        test_client, test_db, register_user_data, "fbnotinterested@example.com", "fbnotinteresteduser"
+    )
 
     response = await test_client.post(
         f"/api/recommendations/{recommendation_id}/feedback",
@@ -208,12 +237,11 @@ async def test_record_feedback_not_interested(test_client: AsyncClient, register
 
 
 @pytest.mark.asyncio
-async def test_record_feedback_duplicate(test_client: AsyncClient, register_user_data):
+async def test_record_feedback_duplicate(test_client: AsyncClient, test_db, register_user_data):
     """Test recording duplicate video feedback"""
-    response = await test_client.post("/api/auth/register", json=register_user_data)
-    access_token = response.json()["access_token"]
-
-    recommendation_id = uuid4()
+    access_token, recommendation_id = await _create_recommendation(
+        test_client, test_db, register_user_data, "fbduplicate@example.com", "fbduplicateuser"
+    )
 
     response = await test_client.post(
         f"/api/recommendations/{recommendation_id}/feedback",
@@ -227,12 +255,11 @@ async def test_record_feedback_duplicate(test_client: AsyncClient, register_user
 
 
 @pytest.mark.asyncio
-async def test_record_feedback_nsfw(test_client: AsyncClient, register_user_data):
+async def test_record_feedback_nsfw(test_client: AsyncClient, test_db, register_user_data):
     """Test recording NSFW content feedback"""
-    response = await test_client.post("/api/auth/register", json=register_user_data)
-    access_token = response.json()["access_token"]
-
-    recommendation_id = uuid4()
+    access_token, recommendation_id = await _create_recommendation(
+        test_client, test_db, register_user_data, "fbnsfw@example.com", "fbnsfwuser"
+    )
 
     response = await test_client.post(
         f"/api/recommendations/{recommendation_id}/feedback",
@@ -243,6 +270,24 @@ async def test_record_feedback_nsfw(test_client: AsyncClient, register_user_data
         headers={"Authorization": f"Bearer {access_token}"}
     )
     assert response.status_code == 201
+
+
+@pytest.mark.asyncio
+async def test_record_feedback_nonexistent_recommendation_404(test_client: AsyncClient, register_user_data):
+    """Regression test: feedback on a recommendation_id that doesn't exist
+    (fabricated, or for a recommendation that's since been pruned) must
+    404 cleanly, not 500 from a raw ForeignKeyViolation. Previously this
+    passed silently in tests because SQLite doesn't enforce FK constraints
+    by default - it always would have 500'd against real Postgres."""
+    response = await test_client.post("/api/auth/register", json=register_user_data)
+    access_token = response.json()["access_token"]
+
+    response = await test_client.post(
+        f"/api/recommendations/{uuid4()}/feedback",
+        json={"feedback_type": "relevant"},
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert response.status_code == 404
 
 
 @pytest.mark.asyncio

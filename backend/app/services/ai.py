@@ -100,11 +100,13 @@ class AIService:
         request: BackgroundRemovalRequest,
     ) -> Tuple[BackgroundRemoval, AIGeneration]:
         """Initiate background removal/replacement operation"""
+        segment = await db.get(Segment, segment_id)
+
         # Create AI generation tracking
         ai_gen = await AIService.create_ai_generation(
             db,
             user_id,
-            segment_id,
+            segment.draft_id,
             "background_removal",
             {"mode": request.mode, "blur_level": request.blur_level},
             CREDIT_COSTS["background_removal"],
@@ -150,11 +152,13 @@ class AIService:
         request: VoiceoverRequest,
     ) -> Tuple[Voiceover, AIGeneration]:
         """Generate text-to-speech voiceover"""
+        segment = await db.get(Segment, segment_id)
+
         # Create AI generation tracking
         ai_gen = await AIService.create_ai_generation(
             db,
             user_id,
-            segment_id,
+            segment.draft_id,
             "voiceover",
             {
                 "text": request.text,
@@ -209,11 +213,13 @@ class AIService:
         request: AutoCaptionRequest,
     ) -> Tuple[AutoCaption, AIGeneration]:
         """Generate automatic captions/subtitles"""
+        segment = await db.get(Segment, segment_id)
+
         # Create AI generation tracking
         ai_gen = await AIService.create_ai_generation(
             db,
             user_id,
-            segment_id,
+            segment.draft_id,
             "caption",
             {
                 "language": request.language,
@@ -314,11 +320,13 @@ class AIService:
         request: ColorCorrectionRequest,
     ) -> Tuple[ColorCorrection, AIGeneration]:
         """Apply color correction/grading"""
+        segment = await db.get(Segment, segment_id)
+
         # Create AI generation tracking
         ai_gen = await AIService.create_ai_generation(
             db,
             user_id,
-            segment_id,
+            segment.draft_id,
             "color_correction",
             {
                 "method": request.method,
@@ -377,11 +385,13 @@ class AIService:
         target_aspect_ratio: str = "9:16",
     ) -> Tuple[AutoFrame, AIGeneration]:
         """Generate smart framing suggestions"""
+        segment = await db.get(Segment, segment_id)
+
         # Create AI generation tracking
         ai_gen = await AIService.create_ai_generation(
             db,
             user_id,
-            segment_id,
+            segment.draft_id,
             "auto_frame",
             {"target_aspect_ratio": target_aspect_ratio},
             CREDIT_COSTS["auto_frame"],

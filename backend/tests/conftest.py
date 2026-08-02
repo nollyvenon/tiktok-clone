@@ -4,6 +4,7 @@ Pytest configuration and fixtures
 
 import pytest
 import pytest_asyncio
+from sqlalchemy import event
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from app.database import Base
 from app.main import app
@@ -21,6 +22,16 @@ pytest_plugins = ('pytest_asyncio',)
 async def test_db():
     """Create test database and tables"""
     engine = create_async_engine(TEST_DATABASE_URL, echo=False)
+
+    # SQLite doesn't enforce foreign key constraints unless explicitly told
+    # to - without this, a broken FK reference (e.g. inserting a row with
+    # a made-up UUID for a required foreign key) silently succeeds here but
+    # would hard-fail against the real Postgres database, hiding real bugs.
+    @event.listens_for(engine.sync_engine, "connect")
+    def _enable_sqlite_foreign_keys(dbapi_connection, connection_record):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
