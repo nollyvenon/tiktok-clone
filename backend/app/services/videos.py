@@ -392,6 +392,52 @@ class VideoService:
         return result.scalar() is not None
 
     @staticmethod
+    async def get_bookmarked_videos(
+        db: AsyncSession,
+        user_id: UUID,
+        limit: int = 20,
+        offset: int = 0,
+    ) -> Tuple[List[Video], int]:
+        """
+        Get a user's bookmarked videos, most recently bookmarked first.
+        Videos that were later unpublished/soft-deleted are excluded, even
+        though the Bookmark row itself is left alone (matches how likes
+        are handled elsewhere - the bookmark isn't silently dropped, it
+        just won't render until the video is public again).
+
+        Returns:
+            Tuple of (videos_list, total_count)
+        """
+        count_result = await db.execute(
+            select(func.count()).select_from(Bookmark).join(Video, Bookmark.video_id == Video.id).where(
+                and_(
+                    Bookmark.user_id == user_id,
+                    Video.status == VideoStatus.PUBLISHED,
+                    Video.is_public == True,
+                )
+            )
+        )
+        total = count_result.scalar() or 0
+
+        result = await db.execute(
+            select(Bookmark).join(Video, Bookmark.video_id == Video.id).where(
+                and_(
+                    Bookmark.user_id == user_id,
+                    Video.status == VideoStatus.PUBLISHED,
+                    Video.is_public == True,
+                )
+            ).order_by(desc(Bookmark.created_at)).offset(offset).limit(limit)
+        )
+        bookmarks = result.scalars().all()
+
+        video_ids = [b.video_id for b in bookmarks]
+        videos_result = await db.execute(select(Video).where(Video.id.in_(video_ids)))
+        videos_by_id = {v.id: v for v in videos_result.scalars().all()}
+        videos = [videos_by_id[vid] for vid in video_ids if vid in videos_by_id]
+
+        return videos, total
+
+    @staticmethod
     async def track_view(
         db: AsyncSession,
         user_id: Optional[UUID],

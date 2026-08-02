@@ -126,6 +126,7 @@ async def get_trending(
     limit: int = Query(20, ge=1, le=50),
     offset: int = Query(0, ge=0),
     timeframe_hours: int = Query(24, ge=1, le=168),
+    current_user: Optional[User] = Depends(get_optional_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -144,6 +145,12 @@ async def get_trending(
         video_responses = []
         for video in videos:
             user = await ProfileService.get_user_profile(db, video.user_id)
+            is_liked = False
+            is_bookmarked = False
+            if current_user:
+                is_liked = await VideoService.is_liked(db, current_user.id, video.id)
+                is_bookmarked = await VideoService.is_bookmarked(db, current_user.id, video.id)
+
             video_responses.append(
                 VideoDetailResponse(
                     id=video.id,
@@ -165,8 +172,8 @@ async def get_trending(
                     completion_rate=video.completion_rate,
                     created_at=video.created_at,
                     published_at=video.published_at,
-                    is_liked=False,
-                    is_bookmarked=False,
+                    is_liked=is_liked,
+                    is_bookmarked=is_bookmarked,
                     allow_comments=video.allow_comments,
                     allow_duets=video.allow_duets,
                     allow_stitches=video.allow_stitches,
@@ -193,6 +200,7 @@ async def search_videos(
     q: str = Query(..., description="Search query"),
     limit: int = Query(20, ge=1, le=50),
     offset: int = Query(0, ge=0),
+    current_user: Optional[User] = Depends(get_optional_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -205,6 +213,78 @@ async def search_videos(
     """
     try:
         videos, total = await VideoService.search_videos(db, q, limit=limit, offset=offset)
+
+        video_responses = []
+        for video in videos:
+            user = await ProfileService.get_user_profile(db, video.user_id)
+            is_liked = False
+            is_bookmarked = False
+            if current_user:
+                is_liked = await VideoService.is_liked(db, current_user.id, video.id)
+                is_bookmarked = await VideoService.is_bookmarked(db, current_user.id, video.id)
+
+            video_responses.append(
+                VideoDetailResponse(
+                    id=video.id,
+                    user_id=video.user_id,
+                    user=UserPublicProfile.from_orm(user),
+                    title=video.title,
+                    description=video.description,
+                    video_url=video.video_url,
+                    thumbnail_url=video.thumbnail_url,
+                    duration=video.duration,
+                    hashtags=video.hashtags,
+                    location=video.location,
+                    is_public=video.is_public,
+                    views_count=video.views_count,
+                    likes_count=video.likes_count,
+                    comments_count=video.comments_count,
+                    shares_count=video.shares_count,
+                    bookmarks_count=video.bookmarks_count,
+                    completion_rate=video.completion_rate,
+                    created_at=video.created_at,
+                    published_at=video.published_at,
+                    is_liked=is_liked,
+                    is_bookmarked=is_bookmarked,
+                    allow_comments=video.allow_comments,
+                    allow_duets=video.allow_duets,
+                    allow_stitches=video.allow_stitches,
+                )
+            )
+
+        return FeedResponse(videos=video_responses, total=total)
+    except Exception as e:
+        logger.error(f"Search videos error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to search videos",
+        )
+
+
+@router.get(
+    "/bookmarks",
+    response_model=FeedResponse,
+    responses={
+        200: {"description": "Bookmarked videos"},
+        401: {"model": ErrorResponse, "description": "Unauthorized"},
+    },
+)
+async def get_bookmarked_videos(
+    limit: int = Query(20, ge=1, le=50),
+    offset: int = Query(0, ge=0),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Get the current user's bookmarked videos, most recently saved first
+
+    **Authorization:** Requires valid access token - bookmarks are private
+    and never exposed for any user other than their owner.
+    """
+    try:
+        videos, total = await VideoService.get_bookmarked_videos(
+            db, current_user.id, limit=limit, offset=offset
+        )
 
         video_responses = []
         for video in videos:
@@ -230,8 +310,8 @@ async def search_videos(
                     completion_rate=video.completion_rate,
                     created_at=video.created_at,
                     published_at=video.published_at,
-                    is_liked=False,
-                    is_bookmarked=False,
+                    is_liked=await VideoService.is_liked(db, current_user.id, video.id),
+                    is_bookmarked=True,
                     allow_comments=video.allow_comments,
                     allow_duets=video.allow_duets,
                     allow_stitches=video.allow_stitches,
@@ -240,10 +320,10 @@ async def search_videos(
 
         return FeedResponse(videos=video_responses, total=total)
     except Exception as e:
-        logger.error(f"Search videos error: {e}")
+        logger.error(f"Get bookmarked videos error: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to search videos",
+            detail="Failed to retrieve bookmarked videos",
         )
 
 
@@ -331,6 +411,7 @@ async def get_user_videos(
     user_id: UUID,
     limit: int = Query(20, ge=1, le=50),
     offset: int = Query(0, ge=0),
+    current_user: Optional[User] = Depends(get_optional_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -349,6 +430,12 @@ async def get_user_videos(
         video_responses = []
         for video in videos:
             user = await ProfileService.get_user_profile(db, video.user_id)
+            is_liked = False
+            is_bookmarked = False
+            if current_user:
+                is_liked = await VideoService.is_liked(db, current_user.id, video.id)
+                is_bookmarked = await VideoService.is_bookmarked(db, current_user.id, video.id)
+
             video_responses.append(
                 VideoDetailResponse(
                     id=video.id,
@@ -370,8 +457,8 @@ async def get_user_videos(
                     completion_rate=video.completion_rate,
                     created_at=video.created_at,
                     published_at=video.published_at,
-                    is_liked=False,
-                    is_bookmarked=False,
+                    is_liked=is_liked,
+                    is_bookmarked=is_bookmarked,
                     allow_comments=video.allow_comments,
                     allow_duets=video.allow_duets,
                     allow_stitches=video.allow_stitches,

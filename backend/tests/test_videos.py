@@ -299,6 +299,110 @@ async def test_bookmark_video(test_client: AsyncClient, register_user_data):
 
 
 @pytest.mark.asyncio
+async def test_get_bookmarked_videos(test_client: AsyncClient, register_user_data):
+    access_token, _ = await _register_and_login(
+        test_client, register_user_data, "bookmarklist1@example.com", "bookmarklist1user"
+    )
+
+    saved_response = await test_client.post(
+        "/api/videos",
+        json={"title": "Saved video", "video_url": "https://example.com/saved.mp4"},
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    saved_id = saved_response.json()["id"]
+
+    unsaved_response = await test_client.post(
+        "/api/videos",
+        json={"title": "Not saved", "video_url": "https://example.com/notsaved.mp4"},
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    unsaved_id = unsaved_response.json()["id"]
+
+    await test_client.post(
+        f"/api/videos/{saved_id}/bookmark", headers={"Authorization": f"Bearer {access_token}"}
+    )
+
+    response = await test_client.get(
+        "/api/videos/bookmarks", headers={"Authorization": f"Bearer {access_token}"}
+    )
+    assert response.status_code == 200
+    data = response.json()
+    video_ids = [v["id"] for v in data["videos"]]
+    assert saved_id in video_ids
+    assert unsaved_id not in video_ids
+    assert all(v["is_bookmarked"] is True for v in data["videos"])
+
+
+@pytest.mark.asyncio
+async def test_get_bookmarked_videos_requires_auth(test_client: AsyncClient):
+    response = await test_client.get("/api/videos/bookmarks")
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_unbookmarked_video_disappears_from_bookmarks_list(
+    test_client: AsyncClient, register_user_data
+):
+    access_token, _ = await _register_and_login(
+        test_client, register_user_data, "bookmarklist2@example.com", "bookmarklist2user"
+    )
+
+    create_response = await test_client.post(
+        "/api/videos",
+        json={"title": "Toggle test", "video_url": "https://example.com/toggle.mp4"},
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    video_id = create_response.json()["id"]
+
+    await test_client.post(
+        f"/api/videos/{video_id}/bookmark", headers={"Authorization": f"Bearer {access_token}"}
+    )
+    await test_client.post(
+        f"/api/videos/{video_id}/bookmark", headers={"Authorization": f"Bearer {access_token}"}
+    )
+
+    response = await test_client.get(
+        "/api/videos/bookmarks", headers={"Authorization": f"Bearer {access_token}"}
+    )
+    assert video_id not in [v["id"] for v in response.json()["videos"]]
+
+
+@pytest.mark.asyncio
+async def test_search_reflects_like_and_bookmark_state_when_authenticated(
+    test_client: AsyncClient, register_user_data
+):
+    """Search results must reflect the requesting user's real is_liked/
+    is_bookmarked state, not the hardcoded False that was always returned
+    regardless of auth."""
+    access_token, _ = await _register_and_login(
+        test_client, register_user_data, "searchflags@example.com", "searchflagsuser"
+    )
+
+    create_response = await test_client.post(
+        "/api/videos",
+        json={"title": "Searchable unique flagcheck", "video_url": "https://example.com/searchflag.mp4"},
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    video_id = create_response.json()["id"]
+    await test_client.post(
+        f"/api/videos/{video_id}/like", headers={"Authorization": f"Bearer {access_token}"}
+    )
+    await test_client.post(
+        f"/api/videos/{video_id}/bookmark", headers={"Authorization": f"Bearer {access_token}"}
+    )
+
+    response = await test_client.get(
+        "/api/videos/search",
+        params={"q": "flagcheck"},
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert response.status_code == 200
+    video = next(v for v in response.json()["videos"] if v["id"] == video_id)
+    assert video["is_liked"] is True
+    assert video["is_bookmarked"] is True
+
+
+@pytest.mark.asyncio
 async def test_track_view(test_client: AsyncClient, register_user_data):
     """Test tracking video view"""
     # Create video
