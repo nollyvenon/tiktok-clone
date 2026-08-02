@@ -1051,6 +1051,47 @@ class CommentLike(Base):
 
 
 # ============================================================================
+# MODULE 14: DIRECT MESSAGING
+# ============================================================================
+
+class Conversation(Base):
+    """
+    A 1-on-1 conversation between two users. user1_id is always the
+    lexicographically-smaller UUID of the pair - normalizing the order
+    lets a unique constraint prevent duplicate conversations for the same
+    pair regardless of who started it.
+    """
+    __tablename__ = "conversations"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user1_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    user2_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    last_message_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint('user1_id', 'user2_id', name='unique_conversation_pair'),
+    )
+
+
+class Message(Base):
+    """A single message within a conversation"""
+    __tablename__ = "messages"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    conversation_id = Column(UUID(as_uuid=True), ForeignKey("conversations.id", ondelete="CASCADE"), nullable=False, index=True)
+    sender_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    content = Column(Text, nullable=False)
+    is_read = Column(Boolean, default=False, nullable=False)
+    read_at = Column(DateTime, nullable=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    deleted_at = Column(DateTime, nullable=True)
+
+
+# ============================================================================
 # MODULE 10: NOTIFICATIONS SYSTEM
 # ============================================================================
 

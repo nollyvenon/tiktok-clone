@@ -1223,6 +1223,51 @@ class CommentLikeResponse(BaseModel):
 
 
 # ============================================================================
+# Direct Messaging Schemas
+# ============================================================================
+
+class MessageCreate(BaseModel):
+    """Send a message"""
+    content: str = Field(..., min_length=1, max_length=2000)
+
+
+class MessageResponse(BaseModel):
+    """A single message"""
+    id: UUID
+    conversation_id: UUID
+    sender_id: UUID
+    content: str
+    is_read: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class MessageListResponse(BaseModel):
+    """Paginated list of messages within a conversation"""
+    messages: List[MessageResponse]
+    total: int
+    limit: int
+    offset: int
+
+
+class ConversationResponse(BaseModel):
+    """A conversation, from the perspective of the requesting user"""
+    id: UUID
+    other_user: UserPublicProfile
+    last_message: Optional[MessageResponse] = None
+    unread_count: int
+    updated_at: datetime
+
+
+class ConversationListResponse(BaseModel):
+    """Paginated list of the current user's conversations"""
+    conversations: List[ConversationResponse]
+    total: int
+
+
+# ============================================================================
 # Error Schemas
 # ============================================================================
 
