@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../../models/video.dart';
 import '../../services/feed_service.dart';
+import '../../services/notification_service.dart';
 import '../../widgets/video_player_item.dart';
+import '../notifications/notifications_screen.dart';
 import '../profile/profile_screen.dart';
 
 class FeedScreen extends StatefulWidget {
@@ -14,17 +16,29 @@ class FeedScreen extends StatefulWidget {
 
 class _FeedScreenState extends State<FeedScreen> {
   final _feedService = FeedService();
+  final _notificationService = NotificationService();
   final _pageController = PageController();
   final List<Video> _videos = [];
   int _activeIndex = 0;
   bool _isLoading = true;
   bool _isLoadingMore = false;
   String? _error;
+  int _unreadNotifications = 0;
 
   @override
   void initState() {
     super.initState();
     _loadFeed();
+    _loadUnreadCount();
+  }
+
+  Future<void> _loadUnreadCount() async {
+    try {
+      final page = await _notificationService.getNotifications(limit: 1, unreadOnly: true);
+      if (mounted) setState(() => _unreadNotifications = page.unreadCount);
+    } catch (_) {
+      // Non-critical: badge just stays at 0 if this fails
+    }
   }
 
   Future<void> _loadFeed() async {
@@ -131,38 +145,61 @@ class _FeedScreenState extends State<FeedScreen> {
 
     return Scaffold(
       backgroundColor: Colors.black,
-      body: PageView.builder(
-        controller: _pageController,
-        scrollDirection: Axis.vertical,
-        itemCount: _videos.length,
-        onPageChanged: (index) {
-          setState(() => _activeIndex = index);
-          if (index >= _videos.length - 3) _loadMore();
-        },
-        itemBuilder: (context, index) {
-          final video = _videos[index];
-          return Stack(
-            fit: StackFit.expand,
-            children: [
-              VideoPlayerItem(video: video, isActive: index == _activeIndex),
-              Positioned(
-                left: 12,
-                right: 80,
-                bottom: 24,
-                child: _VideoInfo(video: video),
-              ),
-              Positioned(
-                right: 12,
-                bottom: 24,
-                child: _EngagementBar(
-                  video: video,
-                  onLike: () => _toggleLike(index),
-                  onBookmark: () => _toggleBookmark(index),
+      body: Stack(
+        children: [
+          PageView.builder(
+            controller: _pageController,
+            scrollDirection: Axis.vertical,
+            itemCount: _videos.length,
+            onPageChanged: (index) {
+              setState(() => _activeIndex = index);
+              if (index >= _videos.length - 3) _loadMore();
+            },
+            itemBuilder: (context, index) {
+              final video = _videos[index];
+              return Stack(
+                fit: StackFit.expand,
+                children: [
+                  VideoPlayerItem(video: video, isActive: index == _activeIndex),
+                  Positioned(
+                    left: 12,
+                    right: 80,
+                    bottom: 24,
+                    child: _VideoInfo(video: video),
+                  ),
+                  Positioned(
+                    right: 12,
+                    bottom: 24,
+                    child: _EngagementBar(
+                      video: video,
+                      onLike: () => _toggleLike(index),
+                      onBookmark: () => _toggleBookmark(index),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+          Positioned(
+            top: 8,
+            right: 8,
+            child: SafeArea(
+              child: IconButton(
+                icon: Badge(
+                  isLabelVisible: _unreadNotifications > 0,
+                  label: Text('$_unreadNotifications'),
+                  child: const Icon(Icons.notifications, color: Colors.white),
                 ),
+                onPressed: () async {
+                  await Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+                  );
+                  _loadUnreadCount();
+                },
               ),
-            ],
-          );
-        },
+            ),
+          ),
+        ],
       ),
     );
   }
