@@ -49,23 +49,34 @@ wrapping the page in `Suspense` per Next.js's `useSearchParams` rule).
 
 ### Module 9 — Hashtag Trending & Challenges
 Did not have any UI at all before this pass.
-- **Web**: new `/discover` page — active challenges (with prize pool /
-  entry count) and ranked trending hashtags (with a trend-velocity
-  indicator), linked from the Navbar on both desktop and mobile menus.
-- **Mobile**: `hashtag_service.dart` + `DiscoverScreen`, added as a new
-  bottom-nav tab between Feed and Drafts, matching the web page.
-- **Not built**: hashtag analytics chart (`GET /hashtags/{hashtag}/
-  analytics` exists, no UI reads it), challenge creation UI (admin-only
-  endpoint, no admin surface exists yet), challenge detail/video-grid page
-  (the endpoint is fixed and tested but nothing links to it yet).
+- **Web**: `/discover` — active challenges (with prize pool / entry count)
+  and ranked trending hashtags (with a trend-velocity indicator), linked
+  from the Navbar. Challenge cards link to `/discover/challenges/
+  [challengeId]` (challenge info + video-grid entries). Hashtag rows link
+  to `/discover/hashtags/[hashtag]` (stat tiles + a CSS-only 30-day usage
+  bar chart).
+- **Mobile**: `hashtag_service.dart` + `DiscoverScreen` as a bottom-nav tab,
+  with taps opening `ChallengeDetailScreen` and `HashtagAnalyticsScreen`
+  (a simple `FractionallySizedBox`-based bar chart — no charting package
+  needed).
+- **Not built**: challenge creation UI (admin-only endpoint, no admin
+  surface exists yet).
 
 ---
 
+## Second pass: closing the challenge/analytics gaps surfaced one more bug
+
+`GET /hashtags/{hashtag}/analytics` was covered by the service-level tests
+but never through HTTP. Adding a real HTTP test for it (`test_get_hashtag_
+analytics_route`) immediately failed: `HashtagAnalyticsResponse.total_likes`
+doesn't exist on the `HashtagAnalytics` model — it's `total_engagement`.
+Fixed the schema to match (tracked in the Modules 4-7 doc alongside the
+other schema/model mismatches found the same way).
+
 ## Verification performed
 
-- Backend: `pytest tests/` — **179/179 passing** (up from 165 after adding
-  the two new HTTP-level test files and fixing the bugs they caught).
-- Web: `npx tsc --noEmit` clean; `next build` succeeds, 14 routes.
+- Backend: `pytest tests/` — **182/182 passing** (up from 179).
+- Web: `npx tsc --noEmit` clean; `next build` succeeds, 17 routes.
 - Mobile: `flutter analyze` — 0 issues; `flutter test` — 2/2 passing.
 
 ## Known gaps carried over

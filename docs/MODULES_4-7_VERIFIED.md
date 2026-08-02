@@ -53,44 +53,62 @@ failures across Modules 4-7"):
 
 ### Module 5 — Video Editor
 - **Web**: `/edit/[draftId]` — per-segment effect picker, speed/volume
-  sliders, mute toggle, text-overlay dialog, export button. Linked from
-  the drafts list.
+  sliders, mute toggle, text-overlay dialog, sticker add/list/delete,
+  up/down segment reordering (calls the real reorder-segments endpoint),
+  export button. Linked from the drafts list.
 - **Mobile**: `editor_service.dart` + `editor_screen.dart`, same capability
   set, linked from the drafts screen.
-- Not built: sticker UI, drag-to-reorder timeline (reorder endpoint exists,
-  no UI consumes it yet), trim UI (endpoint exists, unused).
+- Not built: a real drag-handle timeline (up/down buttons exercise the same
+  reorder endpoint without a new drag-and-drop dependency), trim UI
+  (endpoint exists, unused).
 
 ### Module 6 — AI Creator Studio
 - **Web + Mobile**: an "AI tools" section on each segment in the editor
-  (remove background, auto captions, auto color, smart frame), with
-  inline status/credit-cost feedback.
-- Not built: voiceover UI (needs a voice-picker + text input, deferred),
-  sound recommendations browser, trend suggestions, AI credits/usage
-  dashboard (`GET /ai/credits` exists, no UI reads it yet).
+  (remove background, auto captions, auto color, smart frame, voiceover
+  with script + voice picker), with inline status/credit-cost feedback.
+  Plus a Sound Recommendations browser (category filter, trending badge) —
+  browse-only, since there's no "apply sound to video" endpoint on the
+  backend.
+- Not built: trend suggestions UI, AI credits/usage dashboard (`GET
+  /ai/credits` exists, no UI reads it yet).
 
 ### Module 7 — Recommendations
-- **Web + Mobile**: `/settings/preferences` — content-diversity slider,
-  recency slider, preferred-hashtags input, average watch time. Linked
-  from the profile page/screen.
-- **Deliberately not built**: a "For You" feed UI. `GET /recommendations/
-  for-you` returns a different shape (`RecommendationResponse` with
-  `score`/`algorithm`/`reason`) than the `FeedResponse` Module 3's home
-  feed already uses, and recommendation feedback is keyed by
-  `recommendation_id` (only available from that feed's items, not from a
-  video id). Building a second, parallel feed page would either duplicate
-  Module 3's feed or require gutting it — left as an explicit follow-up
-  rather than bolted on wrong.
+- **Web + Mobile**: `/settings/preferences` (content-diversity/recency
+  sliders, preferred hashtags) and `/for-you` — the real
+  `RecommendationResponse`-shaped feed (score/algorithm-labeled cards,
+  cursor-based pagination, thumbs up/down feedback keyed by
+  `recommendation_id`). This was deferred in the original pass pending two
+  backend bugs (below) that made it impossible to build correctly; both
+  are now fixed.
+
+---
+
+## Second pass: 3 more real bugs found closing these gaps
+
+Building the deferred UI surfaced bugs the original (service-level-only)
+tests never exercised, because no test had ever populated the rows needed
+to trigger them:
+
+- `GET /recommendations/for-you`: `RecommendationResponse.from_orm(r)` on a
+  `Recommendation` row that has no `video` relationship (only a `video_id`
+  FK) — 500'd whenever a real recommendation existed. No test had ever
+  created one. Fixed with a helper that fetches and nests the video.
+- `GET /recommendations/similar/{video_id}`: built `{"video": v}`-only
+  dicts missing every other required field — always 500'd. Switched the
+  response model to `FeedResponse` since similarity matches aren't scored
+  `Recommendation` records to begin with.
+- `HashtagAnalyticsResponse.total_likes` — the `HashtagAnalytics` model has
+  no such column, only `total_engagement`. Fixed the schema to match.
+
+Added tests for all three; full suite: **182/182 passing**.
 
 ---
 
 ## Verification performed
 
-- Backend: `pytest tests/` — **165/165 passing**, re-run clean after all
-  frontend work in this pass (no regressions).
-- Web: `npx tsc --noEmit` clean; `next build` succeeds, 13 routes
-  (`/`, `/create`, `/drafts`, `/edit/[draftId]`, `/forgot-password`,
-  `/login`, `/oauth/callback`, `/profile/[id]`, `/register`, `/search`,
-  `/settings/preferences`, `/settings/two-factor`, `/watch/[id]`).
+- Backend: `pytest tests/` — **182/182 passing** (up from 165), including
+  new tests for the bugs found in the second pass.
+- Web: `npx tsc --noEmit` clean; `next build` succeeds, 17 routes.
 - Mobile: `flutter analyze` — 0 issues; `flutter test` — 2/2 passing.
 
 ## Known gaps carried over from Modules 1-3
