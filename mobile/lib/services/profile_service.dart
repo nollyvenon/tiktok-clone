@@ -84,11 +84,13 @@ class ProfileService {
     }
   }
 
-  Future<void> blockUser(String userId) async {
+  /// Toggles block state - returns the new is_blocked value.
+  Future<bool> toggleBlock(String userId) async {
     try {
-      await _dio.post('/api/profiles/$userId/block');
+      final response = await _dio.post('/api/profiles/$userId/block');
+      return response.data['is_blocked'] as bool;
     } on DioException catch (e) {
-      throw ApiException(_extractError(e, 'Failed to block user'));
+      throw ApiException(_extractError(e, 'Failed to update block status'));
     }
   }
 

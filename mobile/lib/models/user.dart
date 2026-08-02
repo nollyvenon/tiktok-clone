@@ -13,6 +13,10 @@ class User {
   final String? website;
   final bool isCreator;
   final bool isVerified;
+  // Only populated on followers/following list entries (mutual-follow
+  // context relative to the requesting user); absent elsewhere.
+  final bool isFollowing;
+  final bool isFollowedBy;
 
   User({
     required this.id,
@@ -26,6 +30,8 @@ class User {
     this.website,
     required this.isCreator,
     required this.isVerified,
+    this.isFollowing = false,
+    this.isFollowedBy = false,
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
@@ -41,6 +47,8 @@ class User {
       website: json['website'] as String?,
       isCreator: json['is_creator'] as bool? ?? false,
       isVerified: json['is_verified'] as bool? ?? false,
+      isFollowing: json['is_following'] as bool? ?? false,
+      isFollowedBy: json['is_followed_by'] as bool? ?? false,
     );
   }
 

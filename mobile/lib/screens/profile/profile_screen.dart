@@ -53,6 +53,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  Future<void> _toggleBlock() async {
+    if (_profile == null) return;
+    try {
+      final isBlocked = await _profileService.toggleBlock(_profile!.user.id);
+      setState(() {
+        _profile = ProfileDetail(
+          user: _profile!.user,
+          statistics: _profile!.statistics,
+          isFollowing: isBlocked ? false : _profile!.isFollowing,
+          isBlocked: isBlocked,
+        );
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      }
+    }
+  }
+
   Future<void> _toggleFollow() async {
     if (_profile == null) return;
     setState(() => _isFollowActionPending = true);
@@ -99,7 +118,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
               icon: const Icon(Icons.logout),
               onPressed: () => context.read<AuthProvider>().logout(),
             ),
-          ],
+          ] else if (_profile != null)
+            PopupMenuButton<String>(
+              onSelected: (value) {
+                if (value == 'block') _toggleBlock();
+              },
+              itemBuilder: (context) => [
+                PopupMenuItem(
+                  value: 'block',
+                  child: Text(_profile!.isBlocked ? 'Unblock' : 'Block'),
+                ),
+              ],
+            ),
         ],
       ),
       body: _isLoading
