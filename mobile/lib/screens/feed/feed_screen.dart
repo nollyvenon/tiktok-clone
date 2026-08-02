@@ -8,6 +8,7 @@ import '../../widgets/comments_sheet.dart';
 import '../notifications/notifications_screen.dart';
 import '../profile/profile_screen.dart';
 import '../upload/upload_screen.dart';
+import '../../widgets/report_sheet.dart';
 
 class FeedScreen extends StatefulWidget {
   const FeedScreen({super.key});
@@ -198,6 +199,7 @@ class _FeedScreenState extends State<FeedScreen> {
                           remixType: 'stitch',
                         ),
                       )),
+                      onReport: () => ReportSheet.show(context, contentType: 'video', contentId: video.id),
                     ),
                   ),
                 ],
@@ -315,6 +317,7 @@ class _EngagementBar extends StatelessWidget {
   final VoidCallback onComment;
   final VoidCallback onDuet;
   final VoidCallback onStitch;
+  final VoidCallback onReport;
 
   const _EngagementBar({
     required this.video,
@@ -323,6 +326,7 @@ class _EngagementBar extends StatelessWidget {
     required this.onComment,
     required this.onDuet,
     required this.onStitch,
+    required this.onReport,
   });
 
   @override
@@ -366,6 +370,8 @@ class _EngagementBar extends StatelessWidget {
           const SizedBox(height: 20),
           _ActionIcon(icon: Icons.content_cut, color: Colors.white, label: 'Stitch', onTap: onStitch),
         ],
+        const SizedBox(height: 20),
+        _ActionIcon(icon: Icons.flag_outlined, color: Colors.white, label: 'Report', onTap: onReport),
       ],
     );
   }

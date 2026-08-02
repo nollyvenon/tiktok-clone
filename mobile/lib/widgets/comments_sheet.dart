@@ -5,6 +5,7 @@ import '../models/comment.dart';
 import '../providers/auth_provider.dart';
 import '../services/comment_service.dart';
 import '../services/auth_service.dart';
+import 'report_sheet.dart';
 
 String _timeAgo(DateTime dt) {
   final seconds = DateTime.now().difference(dt).inSeconds;
@@ -350,6 +351,13 @@ class _CommentTileState extends State<_CommentTile> {
                           InkWell(
                             onTap: widget.onDelete,
                             child: const Icon(Icons.delete_outline, size: 14, color: Colors.grey),
+                          ),
+                        ],
+                        if (!_isOwnComment) ...[
+                          const SizedBox(width: 16),
+                          InkWell(
+                            onTap: () => ReportSheet.show(context, contentType: 'comment', contentId: comment.id),
+                            child: const Icon(Icons.flag_outlined, size: 14, color: Colors.grey),
                           ),
                         ],
                         if (!widget.isReply && _isVideoOwner) ...[

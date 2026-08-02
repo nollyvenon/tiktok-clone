@@ -10,6 +10,7 @@ import '../dashboard/dashboard_screen.dart';
 import '../messages/messages_screen.dart';
 import '../messages/chat_detail_screen.dart';
 import '../../services/message_service.dart';
+import '../../widgets/report_sheet.dart';
 import 'edit_profile_screen.dart';
 import 'follow_list_screen.dart';
 
@@ -285,6 +286,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   onPressed: _isMessageActionPending || profile.isBlocked ? null : _startConversation,
                   style: OutlinedButton.styleFrom(padding: EdgeInsets.zero),
                   child: const Icon(Icons.chat_bubble_outline, size: 18),
+                ),
+              ),
+              const SizedBox(width: 8),
+              SizedBox(
+                height: 44,
+                width: 44,
+                child: OutlinedButton(
+                  onPressed: () => ReportSheet.show(context, contentType: 'user', contentId: profile.user.id),
+                  style: OutlinedButton.styleFrom(padding: EdgeInsets.zero),
+                  child: const Icon(Icons.flag_outlined, size: 18),
                 ),
               ),
             ],
