@@ -1012,6 +1012,45 @@ class Challenge(Base):
 
 
 # ============================================================================
+# MODULE 11: COMMENTS & REPLIES
+# ============================================================================
+
+class Comment(Base):
+    """Video comments, with one level of threaded replies via parent_comment_id"""
+    __tablename__ = "comments"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    video_id = Column(UUID(as_uuid=True), ForeignKey("videos.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    parent_comment_id = Column(UUID(as_uuid=True), ForeignKey("comments.id", ondelete="CASCADE"), nullable=True, index=True)
+
+    content = Column(Text, nullable=False)
+
+    likes_count = Column(Integer, default=0, nullable=False)
+    replies_count = Column(Integer, default=0, nullable=False)
+    is_pinned = Column(Boolean, default=False, nullable=False)
+
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    deleted_at = Column(DateTime, nullable=True)
+
+
+class CommentLike(Base):
+    """Likes on comments"""
+    __tablename__ = "comment_likes"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    comment_id = Column(UUID(as_uuid=True), ForeignKey("comments.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint('comment_id', 'user_id', name='unique_comment_like'),
+    )
+
+
+# ============================================================================
 # MODULE 10: NOTIFICATIONS SYSTEM
 # ============================================================================
 

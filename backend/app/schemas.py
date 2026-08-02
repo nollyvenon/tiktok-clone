@@ -1161,6 +1161,54 @@ class NotificationListResponse(BaseModel):
 
 
 # ============================================================================
+# Comments & Replies (Module 11)
+# ============================================================================
+
+class CommentCreate(BaseModel):
+    """Create a comment or reply"""
+    content: str = Field(..., min_length=1, max_length=1000)
+    parent_comment_id: Optional[UUID] = None
+
+
+class CommentUpdate(BaseModel):
+    """Edit a comment's content"""
+    content: str = Field(..., min_length=1, max_length=1000)
+
+
+class CommentResponse(BaseModel):
+    """Comment response"""
+    id: UUID
+    video_id: UUID
+    user_id: UUID
+    user: UserPublicProfile
+    parent_comment_id: Optional[UUID] = None
+    content: str
+    likes_count: int
+    replies_count: int
+    is_pinned: bool
+    is_liked: bool = False
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class CommentListResponse(BaseModel):
+    """Paginated list of comments"""
+    comments: List[CommentResponse]
+    total: int
+    limit: int
+    offset: int
+
+
+class CommentLikeResponse(BaseModel):
+    """Comment like/unlike response"""
+    is_liked: bool
+    likes_count: int
+
+
+# ============================================================================
 # Error Schemas
 # ============================================================================
 

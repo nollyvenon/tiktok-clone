@@ -1,0 +1,935 @@
+import axios, { AxiosInstance, AxiosError } from 'axios';
+import type { ApiResponse, AuthResponse, FeedResponse, Video, PublicUser, Comment, User, Notification, Message, Conversation } from '@/types';
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
+const createClient = (): AxiosInstance => {
+  const client = axios.create({
+    baseURL: API_URL,
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
+
+  // Add token to requests
+  client.interceptors.request.use((config) => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  });
+
+  // Handle errors
+  client.interceptors.response.use(
+    (response) => response,
+    (error: AxiosError) => {
+      if (error.response?.status === 401) {
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('token');
+          window.location.href = '/login';
+        }
+      }
+      return Promise.reject(error);
+    }
+  );
+
+  return client;
+};
+
+const client = createClient();
+
+// Auth endpoints
+export const authApi = {
+  login: async (email: string, password: string) => {
+    const res = await client.post<AuthResponse>('/api/auth/login', { email, password });
+    return res.data;
+  },
+
+  register: async (email: string, username: string, password: string) => {
+    const res = await client.post<AuthResponse>('/api/auth/register', { email, username, password });
+    return res.data;
+  },
+
+  logout: async (everywhere = false) => {
+    await client.post('/api/auth/logout', null, { params: { everywhere } });
+  },
+
+  getCurrentUser: async () => {
+    const res = await client.get<User>('/api/auth/me');
+    return res.data;
+  },
+
+  refreshToken: async (refreshToken: string) => {
+    const res = await client.post('/api/auth/refresh', { refresh_token: refreshToken });
+    return res.data;
+  },
+
+  changePassword: async (currentPassword: string, newPassword: string, confirmPassword: string) => {
+    await client.post('/api/auth/change-password', {
+      current_password: currentPassword,
+      new_password: newPassword,
+      confirm_password: confirmPassword,
+    });
+  },
+
+  requestPasswordReset: async (email: string) => {
+    await client.post('/api/auth/password-reset', { email });
+  },
+
+  resetPassword: async (token: string, newPassword: string, confirmPassword: string) => {
+    await client.post('/api/auth/password-reset/confirm', {
+      token,
+      new_password: newPassword,
+      confirm_password: confirmPassword,
+    });
+  },
+
+  listSessions: async () => {
+    const res = await client.get('/api/auth/sessions');
+    return res.data as { sessions: Array<{
+      id: string; device_id: string | null; device_name: string | null;
+      ip_address: string | null; is_current: boolean; created_at: string; last_activity: string;
+    }> };
+  },
+
+  revokeSession: async (sessionId: string) => {
+    await client.delete(`/api/auth/sessions/${sessionId}`);
+  },
+
+  sendOTP: async (phoneNumber?: string, email?: string) => {
+    const res = await client.post('/api/auth/otp/send', {
+      phone_number: phoneNumber,
+      email,
+    });
+    return res.data;
+  },
+
+  verifyOTP: async (code: string, phoneNumber?: string, email?: string) => {
+    const res = await client.post('/api/auth/otp/verify', {
+      code,
+      phone_number: phoneNumber,
+      email,
+    });
+    return res.data;
+  },
+
+  setup2FA: async () => {
+    const res = await client.post('/api/auth/2fa/setup');
+    return res.data;
+  },
+
+  verify2FA: async (code: string) => {
+    const res = await client.post('/api/auth/2fa/verify', { code });
+    return res.data;
+  },
+
+  disable2FA: async () => {
+    const res = await client.post('/api/auth/2fa/disable');
+    return res.data;
+  },
+};
+
+// Profile endpoints
+export const profileApi = {
+  getProfile: async (userId: string) => {
+    const res = await client.get(`/api/profiles/${userId}`);
+    return res.data;
+  },
+
+  getProfileByUsername: async (username: string) => {
+    const res = await client.get(`/api/profiles/username/${username}`);
+    return res.data;
+  },
+
+  updateProfile: async (data: {
+    first_name?: string;
+    last_name?: string;
+    bio?: string;
+    avatar_url?: string;
+    cover_url?: string;
+    website?: string;
+  }) => {
+    const res = await client.put('/api/profiles/me', data);
+    return res.data;
+  },
+
+  followUser: async (userId: string) => {
+    const res = await client.post(`/api/profiles/${userId}/follow`);
+    return res.data;
+  },
+
+  getFollowers: async (userId: string, limit = 20, offset = 0) => {
+    const res = await client.get(`/api/profiles/${userId}/followers`, {
+      params: { limit, offset },
+    });
+    return res.data;
+  },
+
+  getFollowing: async (userId: string, limit = 20, offset = 0) => {
+    const res = await client.get(`/api/profiles/${userId}/following`, {
+      params: { limit, offset },
+    });
+    return res.data;
+  },
+
+  blockUser: async (userId: string) => {
+    const res = await client.post(`/api/profiles/${userId}/block`);
+    return res.data;
+  },
+
+  getBlockedUsers: async () => {
+    const res = await client.get('/api/profiles/me/blocked');
+    return res.data;
+  },
+};
+
+// Upload & Draft endpoints
+export const uploadApi = {
+  getPresignedUrl: async (filename: string, fileSize: number, mimeType: string) => {
+    const res = await client.post('/api/uploads/presigned-url', {
+      filename,
+      file_size: fileSize,
+      mime_type: mimeType,
+    });
+    return res.data as { upload_id: string; presigned_url: string; expires_in: number };
+  },
+
+  completeUpload: async (
+    uploadId: string,
+    processedVideoUrl: string,
+    thumbnailUrl: string,
+    duration: number
+  ) => {
+    const res = await client.post(
+      `/api/uploads/${uploadId}/complete`,
+      null,
+      {
+        params: {
+          processed_video_url: processedVideoUrl,
+          thumbnail_url: thumbnailUrl,
+          duration,
+        },
+      }
+    );
+    return res.data;
+  },
+
+  createDraft: async (
+    data: { title?: string; description?: string; hashtags?: string; is_public?: boolean },
+    uploadId?: string
+  ) => {
+    const res = await client.post('/api/uploads/drafts', data, {
+      params: uploadId ? { upload_id: uploadId } : undefined,
+    });
+    return res.data;
+  },
+
+  getDraft: async (draftId: string) => {
+    const res = await client.get(`/api/uploads/drafts/${draftId}`);
+    return res.data;
+  },
+
+  updateDraft: async (draftId: string, data: Record<string, unknown>) => {
+    const res = await client.put(`/api/uploads/drafts/${draftId}`, data);
+    return res.data;
+  },
+
+  deleteDraft: async (draftId: string) => {
+    await client.delete(`/api/uploads/drafts/${draftId}`);
+  },
+
+  getUserDrafts: async (limit = 20, offset = 0) => {
+    const res = await client.get('/api/uploads/drafts', { params: { limit, offset } });
+    return res.data as { drafts: unknown[]; total: number };
+  },
+
+  publishDraft: async (draftId: string) => {
+    const res = await client.post(`/api/uploads/drafts/${draftId}/publish`);
+    return res.data as { message: string; video_id: string; status: string };
+  },
+
+  scheduleDraft: async (draftId: string, publishAt: string) => {
+    const res = await client.post(`/api/uploads/drafts/${draftId}/schedule`, null, {
+      params: { publish_at: publishAt },
+    });
+    return res.data;
+  },
+};
+
+export interface Segment {
+  id: string;
+  start_time: number;
+  end_time: number;
+  order: number;
+  content_type: string;
+  content_url: string;
+  effects: string[] | null;
+  transition_type: string | null;
+  transition_duration: number;
+  volume: number;
+  muted: boolean;
+  created_at: string;
+}
+
+export interface TextOverlay {
+  id: string;
+  text: string;
+  font_family: string;
+  font_size: number;
+  color: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface Sticker {
+  id: string;
+  sticker_url: string;
+  sticker_type: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rotation: number;
+}
+
+export interface EditorState {
+  draft_id: string;
+  segments: Segment[];
+  text_overlays: TextOverlay[];
+  stickers: Sticker[];
+  total_duration: number;
+}
+
+// Editor endpoints (Module 5) - timeline-based segment editing
+export const editorApi = {
+  getEditorState: async (draftId: string) => {
+    const res = await client.get<EditorState>(`/api/editor/drafts/${draftId}/state`);
+    return res.data;
+  },
+
+  addSegment: async (
+    draftId: string,
+    data: {
+      start_time: number;
+      end_time: number;
+      content_type: string;
+      content_url: string;
+      volume?: number;
+      muted?: boolean;
+    }
+  ) => {
+    const res = await client.post<Segment>(`/api/editor/drafts/${draftId}/segments`, data);
+    return res.data;
+  },
+
+  deleteSegment: async (segmentId: string) => {
+    await client.delete(`/api/editor/segments/${segmentId}`);
+  },
+
+  reorderSegments: async (draftId: string, segmentIds: string[]) => {
+    await client.post(`/api/editor/drafts/${draftId}/reorder-segments`, null, {
+      params: { segment_ids: segmentIds },
+      paramsSerializer: { indexes: null },
+    });
+  },
+
+  applyEffect: async (segmentId: string, effectName: string) => {
+    const res = await client.post<Segment>(`/api/editor/segments/${segmentId}/effects/${effectName}`);
+    return res.data;
+  },
+
+  trimSegment: async (segmentId: string, startTime: number, endTime: number) => {
+    const res = await client.post<Segment>(`/api/editor/segments/${segmentId}/trim`, null, {
+      params: { start_time: startTime, end_time: endTime },
+    });
+    return res.data;
+  },
+
+  adjustSpeed: async (segmentId: string, speed: number) => {
+    const res = await client.post<Segment>(`/api/editor/segments/${segmentId}/speed`, null, {
+      params: { speed },
+    });
+    return res.data;
+  },
+
+  adjustVolume: async (segmentId: string, volume: number) => {
+    const res = await client.post<Segment>(`/api/editor/segments/${segmentId}/volume`, null, {
+      params: { volume },
+    });
+    return res.data;
+  },
+
+  muteSegment: async (segmentId: string, muted: boolean) => {
+    const res = await client.post<Segment>(`/api/editor/segments/${segmentId}/mute`, null, {
+      params: { muted },
+    });
+    return res.data;
+  },
+
+  addTextOverlay: async (
+    segmentId: string,
+    data: { text: string; x: number; y: number; width: number; height: number }
+  ) => {
+    const res = await client.post<TextOverlay>(`/api/editor/segments/${segmentId}/overlays`, data);
+    return res.data;
+  },
+
+  deleteTextOverlay: async (overlayId: string) => {
+    await client.delete(`/api/editor/overlays/${overlayId}`);
+  },
+
+  addSticker: async (
+    segmentId: string,
+    data: { sticker_url: string; sticker_type: string; x: number; y: number; width: number; height: number }
+  ) => {
+    const res = await client.post<Sticker>(`/api/editor/segments/${segmentId}/stickers`, data);
+    return res.data;
+  },
+
+  getStickers: async (segmentId: string) => {
+    const res = await client.get(`/api/editor/segments/${segmentId}/stickers`);
+    return res.data as { stickers: Sticker[]; total: number };
+  },
+
+  deleteSticker: async (stickerId: string) => {
+    await client.delete(`/api/editor/stickers/${stickerId}`);
+  },
+
+  exportVideo: async (draftId: string, quality = '1080p', format = 'mp4') => {
+    const res = await client.post(`/api/editor/drafts/${draftId}/export`, null, {
+      params: { quality, format },
+    });
+    return res.data as {
+      export_id: string; draft_id: string; quality: string; format: string;
+      status: string; progress: number; created_at: string;
+    };
+  },
+};
+
+export interface AICreditsInfo {
+  total_credits: number;
+  available_credits: number;
+  used_credits: number;
+  monthly_limit: number;
+  renewal_date: string | null;
+}
+
+// AI Creator Studio endpoints (Module 6)
+export const aiApi = {
+  getCredits: async () => {
+    const res = await client.get<AICreditsInfo>('/api/ai/credits');
+    return res.data;
+  },
+
+  removeBackground: async (data: {
+    segment_id: string;
+    mode: 'blur' | 'remove' | 'replace' | 'green_screen';
+    blur_level?: number;
+    background_url?: string;
+    background_type?: string;
+  }) => {
+    const res = await client.post('/api/ai/background-removal', data);
+    return res.data;
+  },
+
+  generateVoiceover: async (data: {
+    segment_id: string;
+    text: string;
+    language?: string;
+    voice_id: string;
+    speed?: number;
+    pitch?: number;
+    volume?: number;
+  }) => {
+    const res = await client.post('/api/ai/voiceover', data);
+    return res.data;
+  },
+
+  generateCaptions: async (data: {
+    segment_id: string;
+    language?: string;
+    style?: string;
+    position?: string;
+  }) => {
+    const res = await client.post('/api/ai/captions', data);
+    return res.data;
+  },
+
+  applyColorCorrection: async (data: {
+    segment_id: string;
+    method?: string;
+    preset_name?: string;
+    brightness?: number;
+    contrast?: number;
+    saturation?: number;
+  }) => {
+    const res = await client.post('/api/ai/color-correction', data);
+    return res.data;
+  },
+
+  getFrameSuggestions: async (segmentId: string, targetAspectRatio = '9:16') => {
+    const res = await client.post('/api/ai/smart-frame', null, {
+      params: { segment_id: segmentId, target_aspect_ratio: targetAspectRatio },
+    });
+    return res.data;
+  },
+
+  getSoundRecommendations: async (params?: { category?: string; mood?: string; region?: string }) => {
+    const res = await client.get<SoundRecommendationsListResponse>(
+      '/api/ai/sounds/recommendations',
+      { params }
+    );
+    return res.data;
+  },
+
+  getTrendingSounds: async (region = 'US', limit = 10) => {
+    const res = await client.get<SoundRecommendationsListResponse>('/api/ai/sounds/trending', {
+      params: { region, limit },
+    });
+    return res.data;
+  },
+};
+
+export interface SoundRecommendation {
+  id: string;
+  sound_url: string;
+  sound_title: string;
+  artist: string | null;
+  category: string;
+  mood: string | null;
+  duration: number | null;
+  is_trending: boolean;
+}
+
+export interface SoundRecommendationsListResponse {
+  sounds: SoundRecommendation[];
+  total: number;
+  category: string;
+  region: string;
+}
+
+// Video endpoints - matches the real /api/videos routes: offset-based
+// pagination (the `cursor` field is a backend TODO, always null in practice),
+// and single toggle endpoints for like/bookmark rather than separate
+// like+unlike / bookmark+unbookmark pairs.
+export const videoApi = {
+  getFeed: async (feedType: 'for_you' | 'following' = 'for_you', offset = 0, limit = 10) => {
+    const res = await client.get<FeedResponse>('/api/videos/feed', {
+      params: { feed_type: feedType, offset, limit },
+    });
+    return res.data;
+  },
+
+  getVideo: async (id: string) => {
+    const res = await client.get<Video>(`/api/videos/${id}`);
+    return res.data;
+  },
+
+  updateVideo: async (id: string, data: Partial<Video>) => {
+    const res = await client.put<Video>(`/api/videos/${id}`, data);
+    return res.data;
+  },
+
+  deleteVideo: async (id: string) => {
+    await client.delete(`/api/videos/${id}`);
+  },
+
+  /** Toggles like state; returns the resulting is_liked/likes_count. */
+  toggleLike: async (id: string) => {
+    const res = await client.post<{ is_liked: boolean; likes_count: number }>(
+      `/api/videos/${id}/like`
+    );
+    return res.data;
+  },
+
+  /** Toggles bookmark state; returns the resulting is_bookmarked/bookmarks_count. */
+  toggleBookmark: async (id: string) => {
+    const res = await client.post<{ is_bookmarked: boolean; bookmarks_count: number }>(
+      `/api/videos/${id}/bookmark`
+    );
+    return res.data;
+  },
+
+  trackView: async (id: string) => {
+    await client.post(`/api/videos/${id}/view`);
+  },
+
+  search: async (query: string, limit = 20, offset = 0) => {
+    const res = await client.get<FeedResponse>('/api/videos/search', {
+      params: { q: query, limit, offset },
+    });
+    return res.data;
+  },
+
+  getTrending: async (limit = 20, offset = 0) => {
+    const res = await client.get<FeedResponse>('/api/videos/search/trending', {
+      params: { limit, offset },
+    });
+    return res.data;
+  },
+
+  getUserVideos: async (userId: string, limit = 20, offset = 0) => {
+    const res = await client.get<FeedResponse>(`/api/videos/user/${userId}/videos`, {
+      params: { limit, offset },
+    });
+    return res.data;
+  },
+};
+
+// Comment endpoints
+export interface CommentListResult {
+  comments: Comment[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export const commentApi = {
+  getComments: async (videoId: string, limit = 20, offset = 0) => {
+    const res = await client.get<CommentListResult>(`/api/videos/${videoId}/comments`, {
+      params: { limit, offset },
+    });
+    return res.data;
+  },
+
+  getReplies: async (commentId: string, limit = 20, offset = 0) => {
+    const res = await client.get<CommentListResult>(`/api/comments/${commentId}/replies`, {
+      params: { limit, offset },
+    });
+    return res.data;
+  },
+
+  createComment: async (videoId: string, content: string, parentCommentId?: string) => {
+    const res = await client.post<Comment>(`/api/videos/${videoId}/comments`, {
+      content,
+      parent_comment_id: parentCommentId,
+    });
+    return res.data;
+  },
+
+  updateComment: async (id: string, content: string) => {
+    const res = await client.put<Comment>(`/api/comments/${id}`, { content });
+    return res.data;
+  },
+
+  deleteComment: async (id: string) => {
+    await client.delete(`/api/comments/${id}`);
+  },
+
+  likeComment: async (id: string) => {
+    const res = await client.post<{ is_liked: boolean; likes_count: number }>(
+      `/api/comments/${id}/like`
+    );
+    return res.data;
+  },
+
+  pinComment: async (id: string) => {
+    const res = await client.post<Comment>(`/api/comments/${id}/pin`);
+    return res.data;
+  },
+};
+
+// Note: there is no /api/users/* router on the backend - use profileApi for
+// profile CRUD/follow/block and videoApi.getUserVideos for a user's videos.
+
+// Notification endpoints
+export interface NotificationItem {
+  id: string;
+  user_id: string;
+  type: string;
+  actor_id: string | null;
+  related_video_id: string | null;
+  related_comment_id: string | null;
+  title: string;
+  message: string | null;
+  is_read: boolean;
+  read_at: string | null;
+  created_at: string;
+}
+
+export interface NotificationListResult {
+  notifications: NotificationItem[];
+  total: number;
+  unread_count: number;
+  limit: number;
+  offset: number;
+}
+
+export interface NotificationPreferences {
+  id: string;
+  push_enabled: boolean;
+  email_enabled: boolean;
+  in_app_enabled: boolean;
+  follow_notifications: boolean;
+  like_notifications: boolean;
+  comment_notifications: boolean;
+  mention_notifications: boolean;
+  message_notifications: boolean;
+  email_digest_enabled: boolean;
+  email_digest_frequency: string;
+  quiet_hours_enabled: boolean;
+  quiet_hours_start: string | null;
+  quiet_hours_end: string | null;
+}
+
+export const notificationApi = {
+  getNotifications: async (limit = 20, offset = 0, unreadOnly = false) => {
+    const res = await client.get<NotificationListResult>('/api/notifications', {
+      params: { limit, offset, unread_only: unreadOnly },
+    });
+    return res.data;
+  },
+
+  markAsRead: async (id: string) => {
+    const res = await client.put<NotificationItem>(`/api/notifications/${id}/read`);
+    return res.data;
+  },
+
+  markAllAsRead: async () => {
+    const res = await client.put<{ message: string; count: number }>('/api/notifications/read-all');
+    return res.data;
+  },
+
+  deleteNotification: async (id: string) => {
+    await client.delete(`/api/notifications/${id}`);
+  },
+
+  getPreferences: async () => {
+    const res = await client.get<NotificationPreferences>('/api/notifications/preferences');
+    return res.data;
+  },
+
+  updatePreferences: async (data: Partial<Omit<NotificationPreferences, 'id'>>) => {
+    const res = await client.put<NotificationPreferences>('/api/notifications/preferences', data);
+    return res.data;
+  },
+};
+
+// Message endpoints
+export const messageApi = {
+  getConversations: async (cursor?: string) => {
+    const res = await client.get<{ data: Conversation[]; cursor?: string }>(
+      '/api/messages/conversations',
+      { params: { cursor } }
+    );
+    return res.data;
+  },
+
+  getMessages: async (conversationId: string, cursor?: string) => {
+    const res = await client.get<{ data: Message[]; cursor?: string }>(
+      `/api/conversations/${conversationId}/messages`,
+      { params: { cursor } }
+    );
+    return res.data;
+  },
+
+  sendMessage: async (conversationId: string, content: string) => {
+    const res = await client.post<{ data: Message }>(`/api/conversations/${conversationId}/messages`, {
+      content,
+    });
+    return res.data.data;
+  },
+
+  startConversation: async (userId: string) => {
+    const res = await client.post<{ data: Conversation }>('/api/messages/conversations', {
+      participantId: userId,
+    });
+    return res.data.data;
+  },
+};
+
+// Search endpoints
+// Search endpoints - the backend exposes separate endpoints per result type
+// (there is no unified /api/search?q=...&type=... route), and all of them
+// require authentication.
+export const searchApi = {
+  searchVideos: async (query: string, limit = 20, offset = 0) => {
+    const res = await client.get('/api/search/videos', { params: { q: query, limit, offset } });
+    return res.data as { results: Video[]; total: number };
+  },
+
+  searchCreators: async (query: string, limit = 20, offset = 0) => {
+    const res = await client.get('/api/search/creators', { params: { q: query, limit, offset } });
+    return res.data as { results: PublicUser[]; total: number };
+  },
+
+  searchHashtags: async (query: string, limit = 20) => {
+    const res = await client.get('/api/search/hashtags', { params: { q: query, limit } });
+    return res.data;
+  },
+
+  getSuggestions: async (query: string) => {
+    const res = await client.get('/api/search/suggestions', { params: { q: query } });
+    return res.data;
+  },
+
+  discoverByCategory: async (category: string, limit = 30) => {
+    const res = await client.get(`/api/search/discover/${category}`, { params: { limit } });
+    return res.data as { category: string; results: Video[]; total: number };
+  },
+};
+
+export interface UserPreferences {
+  id: string;
+  preferred_creators: string[];
+  preferred_hashtags: string[];
+  preferred_genres: string[];
+  preferred_languages: string[];
+  avg_watch_time: number | null;
+  content_diversity_score: number;
+  recency_preference: number;
+  updated_at: string;
+}
+
+export interface Recommendation {
+  id: string;
+  video_id: string;
+  score: number;
+  algorithm: string;
+  reason: string | null;
+  video: Video;
+  created_at: string;
+}
+
+export interface RecommendationsListResponse {
+  recommendations: Recommendation[];
+  cursor: string | null;
+  total: number;
+}
+
+// Recommendation endpoints (Module 7)
+export const recommendationApi = {
+  getPreferences: async () => {
+    const res = await client.get<UserPreferences>('/api/recommendations/preferences');
+    return res.data;
+  },
+
+  updatePreferences: async (data: {
+    preferred_hashtags?: string[];
+    preferred_genres?: string[];
+    preferred_languages?: string[];
+    content_diversity_score?: number;
+    recency_preference?: number;
+  }) => {
+    const res = await client.put<UserPreferences>('/api/recommendations/preferences', data);
+    return res.data;
+  },
+
+  getForYouFeed: async (limit = 30, cursor?: string) => {
+    const res = await client.get<RecommendationsListResponse>('/api/recommendations/for-you', {
+      params: { limit, cursor },
+    });
+    return res.data;
+  },
+
+  getSimilarVideos: async (videoId: string, limit = 10) => {
+    const res = await client.get<FeedResponse>(`/api/recommendations/similar/${videoId}`, {
+      params: { limit },
+    });
+    return res.data;
+  },
+
+  recordFeedback: async (
+    recommendationId: string,
+    feedbackType: 'relevant' | 'irrelevant' | 'duplicate' | 'nsfw' | 'not_interested',
+    reason?: string
+  ) => {
+    await client.post(`/api/recommendations/${recommendationId}/feedback`, {
+      feedback_type: feedbackType,
+      reason,
+    });
+  },
+};
+
+export interface HashtagTrend {
+  id: string;
+  hashtag: string;
+  region: string;
+  usage_count: number;
+  unique_creators: number;
+  total_views: number;
+  popularity_score: number;
+  trend_velocity: number;
+  rank_position: number | null;
+  category: string | null;
+  is_challenge: boolean;
+}
+
+export interface Challenge {
+  id: string;
+  hashtag: string;
+  title: string;
+  description: string | null;
+  thumbnail_url: string | null;
+  start_date: string;
+  end_date: string;
+  prize_pool: number | null;
+  participation_count: number;
+  is_active: boolean;
+}
+
+// Hashtag trending & challenges endpoints (Module 9)
+export const hashtagApi = {
+  getTrending: async (region = 'US', limit = 20) => {
+    const res = await client.get<HashtagTrend[]>('/api/hashtags/trending', {
+      params: { region, limit },
+    });
+    return res.data;
+  },
+
+  getStats: async (hashtag: string, region = 'US') => {
+    const res = await client.get(`/api/hashtags/${encodeURIComponent(hashtag)}/stats`, {
+      params: { region },
+    });
+    return res.data;
+  },
+
+  search: async (query: string, region = 'US', limit = 20) => {
+    const res = await client.get<HashtagTrend[]>('/api/hashtags/search', {
+      params: { q: query, region, limit },
+    });
+    return res.data;
+  },
+
+  getActiveChallenges: async (region = 'US', limit = 10) => {
+    const res = await client.get<Challenge[]>('/api/hashtags/challenges/active', {
+      params: { region, limit },
+    });
+    return res.data;
+  },
+
+  getChallengeVideos: async (challengeId: string, limit = 30, offset = 0) => {
+    const res = await client.get(`/api/hashtags/challenges/${challengeId}/videos`, {
+      params: { limit, offset },
+    });
+    return res.data as { videos: Video[]; total: number; limit: number; offset: number };
+  },
+
+  getChallengeDetails: async (challengeId: string) => {
+    const res = await client.get<Challenge>(`/api/hashtags/challenges/${challengeId}`);
+    return res.data;
+  },
+
+  getAnalytics: async (hashtag: string, days = 30) => {
+    const res = await client.get<HashtagAnalytics[]>(
+      `/api/hashtags/${encodeURIComponent(hashtag)}/analytics`,
+      { params: { days } }
+    );
+    return res.data;
+  },
+};
+
+export interface HashtagAnalytics {
+  id: string;
+  hashtag: string;
+  date: string;
+  usage_count: number;
+  unique_creators: number;
+  total_views: number;
+  total_engagement: number;
+}
+
+export default client;
