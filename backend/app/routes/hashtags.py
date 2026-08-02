@@ -11,13 +11,45 @@ from app.models import User
 from app.database import get_db
 from app.routes.auth import get_current_user
 from app.services.hashtags import HashtagService
+from app.services.profiles import ProfileService
 from app.schemas import (
     HashtagTrendResponse,
     ChallengeResponse,
     HashtagAnalyticsResponse,
+    VideoDetailResponse,
+    UserPublicProfile,
 )
 
-router = APIRouter(prefix="/api/hashtags", tags=["Hashtags"])
+router = APIRouter(prefix="/hashtags", tags=["Hashtags"])
+
+
+async def _build_video_response(db: AsyncSession, video) -> VideoDetailResponse:
+    """Builds a VideoDetailResponse (with nested author) for a bare Video row."""
+    author = await ProfileService.get_user_profile(db, video.user_id)
+    return VideoDetailResponse(
+        id=video.id,
+        user_id=video.user_id,
+        user=UserPublicProfile.from_orm(author),
+        title=video.title,
+        description=video.description,
+        video_url=video.video_url,
+        thumbnail_url=video.thumbnail_url,
+        duration=video.duration,
+        hashtags=video.hashtags,
+        location=video.location,
+        is_public=video.is_public,
+        views_count=video.views_count,
+        likes_count=video.likes_count,
+        comments_count=video.comments_count,
+        shares_count=video.shares_count,
+        bookmarks_count=video.bookmarks_count,
+        completion_rate=video.completion_rate,
+        created_at=video.created_at,
+        published_at=video.published_at,
+        allow_comments=video.allow_comments,
+        allow_duets=video.allow_duets,
+        allow_stitches=video.allow_stitches,
+    )
 
 
 @router.get("/trending", response_model=list[HashtagTrendResponse])
@@ -140,7 +172,12 @@ async def get_challenge_videos(
     videos, total = await HashtagService.get_challenge_videos(
         db, challenge_id, limit, offset
     )
-    return {"videos": videos, "total": total, "limit": limit, "offset": offset}
+    return {
+        "videos": [await _build_video_response(db, v) for v in videos],
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+    }
 
 
 @router.post("/{hashtag}/track")

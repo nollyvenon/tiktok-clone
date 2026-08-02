@@ -11,12 +11,48 @@ import logging
 from app.database import get_db
 from app.schemas import VideoDetailResponse, UserPublicProfile, ErrorResponse
 from app.services.search import SearchService
+from app.services.profiles import ProfileService
 from app.routes.auth import get_current_user
 from app.models import User
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/search", tags=["Search & Discovery"])
+
+
+async def _build_video_response(db: AsyncSession, video) -> VideoDetailResponse:
+    """
+    Builds a VideoDetailResponse for a bare Video ORM row.
+
+    VideoDetailResponse.user is a required UserPublicProfile - a blind
+    from_orm(video) fails because Video has no populated `user` attribute
+    matching that shape, only a `user_id` column.
+    """
+    author = await ProfileService.get_user_profile(db, video.user_id)
+    return VideoDetailResponse(
+        id=video.id,
+        user_id=video.user_id,
+        user=UserPublicProfile.from_orm(author),
+        title=video.title,
+        description=video.description,
+        video_url=video.video_url,
+        thumbnail_url=video.thumbnail_url,
+        duration=video.duration,
+        hashtags=video.hashtags,
+        location=video.location,
+        is_public=video.is_public,
+        views_count=video.views_count,
+        likes_count=video.likes_count,
+        comments_count=video.comments_count,
+        shares_count=video.shares_count,
+        bookmarks_count=video.bookmarks_count,
+        completion_rate=video.completion_rate,
+        created_at=video.created_at,
+        published_at=video.published_at,
+        allow_comments=video.allow_comments,
+        allow_duets=video.allow_duets,
+        allow_stitches=video.allow_stitches,
+    )
 
 
 # ============================================================================
@@ -62,7 +98,7 @@ async def search_videos(
         )
 
         return {
-            "results": [VideoDetailResponse.from_orm(v) for v in videos],
+            "results": [await _build_video_response(db, v) for v in videos],
             "total": total,
             "limit": limit,
             "offset": offset,
@@ -206,7 +242,7 @@ async def discover_by_category(
 
         return {
             "category": category,
-            "results": [VideoDetailResponse.from_orm(v) for v in videos],
+            "results": [await _build_video_response(db, v) for v in videos],
             "total": len(videos),
         }
     except Exception as e:
@@ -285,7 +321,7 @@ async def advanced_search(
         )
 
         return {
-            "results": [VideoDetailResponse.from_orm(v) for v in videos],
+            "results": [await _build_video_response(db, v) for v in videos],
             "total": total,
             "limit": limit,
             "offset": offset,
