@@ -7,6 +7,7 @@ import '../../widgets/video_player_item.dart';
 import '../../widgets/comments_sheet.dart';
 import '../notifications/notifications_screen.dart';
 import '../profile/profile_screen.dart';
+import '../upload/upload_screen.dart';
 
 class FeedScreen extends StatefulWidget {
   const FeedScreen({super.key});
@@ -183,6 +184,20 @@ class _FeedScreenState extends State<FeedScreen> {
                           setState(() => video.commentsCount += delta);
                         },
                       ),
+                      onDuet: () => Navigator.of(context).push(MaterialPageRoute(
+                        builder: (_) => UploadScreen(
+                          originalVideoId: video.id,
+                          originalVideoUsername: video.author.username,
+                          remixType: 'duet',
+                        ),
+                      )),
+                      onStitch: () => Navigator.of(context).push(MaterialPageRoute(
+                        builder: (_) => UploadScreen(
+                          originalVideoId: video.id,
+                          originalVideoUsername: video.author.username,
+                          remixType: 'stitch',
+                        ),
+                      )),
                     ),
                   ),
                 ],
@@ -241,6 +256,23 @@ class _VideoInfo extends StatelessWidget {
               ],
             ],
           ),
+          if (video.originalVideo != null) ...[
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                Icon(
+                  video.remixType == 'duet' ? Icons.repeat : Icons.content_cut,
+                  color: Colors.white70,
+                  size: 14,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  '${video.remixType == 'duet' ? 'Duet with' : 'Stitch of'} @${video.originalVideo!.user.username}',
+                  style: const TextStyle(color: Colors.white70, fontSize: 13),
+                ),
+              ],
+            ),
+          ],
           if (video.title != null && video.title!.isNotEmpty) ...[
             const SizedBox(height: 6),
             Text(video.title!, style: const TextStyle(color: Colors.white)),
@@ -263,12 +295,16 @@ class _EngagementBar extends StatelessWidget {
   final VoidCallback onLike;
   final VoidCallback onBookmark;
   final VoidCallback onComment;
+  final VoidCallback onDuet;
+  final VoidCallback onStitch;
 
   const _EngagementBar({
     required this.video,
     required this.onLike,
     required this.onBookmark,
     required this.onComment,
+    required this.onDuet,
+    required this.onStitch,
   });
 
   @override
@@ -304,6 +340,14 @@ class _EngagementBar extends StatelessWidget {
         ),
         const SizedBox(height: 20),
         _ActionIcon(icon: Icons.share, color: Colors.white, label: '${video.sharesCount}', onTap: () {}),
+        if (video.allowDuets) ...[
+          const SizedBox(height: 20),
+          _ActionIcon(icon: Icons.repeat, color: Colors.white, label: 'Duet', onTap: onDuet),
+        ],
+        if (video.allowStitches) ...[
+          const SizedBox(height: 20),
+          _ActionIcon(icon: Icons.content_cut, color: Colors.white, label: 'Stitch', onTap: onStitch),
+        ],
       ],
     );
   }

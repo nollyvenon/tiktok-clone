@@ -71,6 +71,8 @@ class UploadService {
     String? title,
     String? description,
     bool isPublic = true,
+    String? originalVideoId,
+    String? remixType,
   }) async {
     try {
       final response = await _dio.post(
@@ -79,6 +81,8 @@ class UploadService {
           if (title != null) 'title': title,
           if (description != null) 'description': description,
           'is_public': isPublic,
+          if (originalVideoId != null) 'original_video_id': originalVideoId,
+          if (remixType != null) 'remix_type': remixType,
         },
         queryParameters: {'upload_id': uploadId},
       );

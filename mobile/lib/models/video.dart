@@ -24,6 +24,29 @@ class VideoAuthor {
   }
 }
 
+class OriginalVideoPreview {
+  final String id;
+  final String? title;
+  final String? thumbnailUrl;
+  final VideoAuthor user;
+
+  OriginalVideoPreview({
+    required this.id,
+    this.title,
+    this.thumbnailUrl,
+    required this.user,
+  });
+
+  factory OriginalVideoPreview.fromJson(Map<String, dynamic> json) {
+    return OriginalVideoPreview(
+      id: json['id'] as String,
+      title: json['title'] as String?,
+      thumbnailUrl: json['thumbnail_url'] as String?,
+      user: VideoAuthor.fromJson(json['user'] as Map<String, dynamic>),
+    );
+  }
+}
+
 class Video {
   final String id;
   final String userId;
@@ -43,6 +66,10 @@ class Video {
   bool isLiked;
   bool isBookmarked;
   final bool allowComments;
+  final bool allowDuets;
+  final bool allowStitches;
+  final String? remixType;
+  final OriginalVideoPreview? originalVideo;
 
   Video({
     required this.id,
@@ -63,6 +90,10 @@ class Video {
     required this.isLiked,
     required this.isBookmarked,
     required this.allowComments,
+    this.allowDuets = true,
+    this.allowStitches = true,
+    this.remixType,
+    this.originalVideo,
   });
 
   factory Video.fromJson(Map<String, dynamic> json) {
@@ -85,6 +116,12 @@ class Video {
       isLiked: json['is_liked'] as bool? ?? false,
       isBookmarked: json['is_bookmarked'] as bool? ?? false,
       allowComments: json['allow_comments'] as bool? ?? true,
+      allowDuets: json['allow_duets'] as bool? ?? true,
+      allowStitches: json['allow_stitches'] as bool? ?? true,
+      remixType: json['remix_type'] as String?,
+      originalVideo: json['original_video'] != null
+          ? OriginalVideoPreview.fromJson(json['original_video'] as Map<String, dynamic>)
+          : null,
     );
   }
 

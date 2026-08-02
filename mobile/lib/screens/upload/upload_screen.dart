@@ -9,7 +9,16 @@ import '../../services/upload_service.dart';
 enum _Stage { idle, requestingUrl, uploading, finalizing, creatingDraft, done }
 
 class UploadScreen extends StatefulWidget {
-  const UploadScreen({super.key});
+  final String? originalVideoId;
+  final String? originalVideoUsername;
+  final String? remixType;
+
+  const UploadScreen({
+    super.key,
+    this.originalVideoId,
+    this.originalVideoUsername,
+    this.remixType,
+  });
 
   @override
   State<UploadScreen> createState() => _UploadScreenState();
@@ -79,6 +88,8 @@ class _UploadScreenState extends State<UploadScreen> {
         title: _titleController.text,
         description: _descriptionController.text,
         isPublic: _isPublic,
+        originalVideoId: widget.originalVideoId,
+        remixType: widget.remixType,
       );
       await _uploadService.publishDraft(draft.id);
 
@@ -125,6 +136,29 @@ class _UploadScreenState extends State<UploadScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          if (widget.originalVideoId != null && widget.remixType != null) ...[
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  Icon(widget.remixType == 'duet' ? Icons.repeat : Icons.content_cut, size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Uploading a ${widget.remixType} response'
+                      '${widget.originalVideoUsername != null ? ' to @${widget.originalVideoUsername}' : ''}',
+                      style: const TextStyle(fontSize: 13),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
           if (_error != null) ...[
             Container(
               padding: const EdgeInsets.all(12),
