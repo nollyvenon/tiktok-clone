@@ -83,6 +83,52 @@ class EditorService {
     }
   }
 
+  Future<void> addSticker(String segmentId, String stickerUrl) async {
+    try {
+      await _dio.post('/api/editor/segments/$segmentId/stickers', data: {
+        'sticker_url': stickerUrl,
+        'sticker_type': 'emoji',
+        'x': 50,
+        'y': 50,
+        'width': 100,
+        'height': 100,
+      });
+    } on DioException catch (e) {
+      throw ApiException(_extractError(e, 'Failed to add sticker'));
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getStickers(String segmentId) async {
+    try {
+      final response = await _dio.get('/api/editor/segments/$segmentId/stickers');
+      return List<Map<String, dynamic>>.from(response.data['stickers'] as List);
+    } on DioException catch (e) {
+      throw ApiException(_extractError(e, 'Failed to load stickers'));
+    }
+  }
+
+  Future<void> deleteSticker(String stickerId) async {
+    try {
+      await _dio.delete('/api/editor/stickers/$stickerId');
+    } on DioException catch (e) {
+      throw ApiException(_extractError(e, 'Failed to delete sticker'));
+    }
+  }
+
+  /// Dio's default query serialization repeats the key for List values
+  /// (segment_ids=a&segment_ids=b), matching FastAPI's List query-param
+  /// convention - no custom serializer needed here.
+  Future<void> reorderSegments(String draftId, List<String> segmentIds) async {
+    try {
+      await _dio.post(
+        '/api/editor/drafts/$draftId/reorder-segments',
+        queryParameters: {'segment_ids': segmentIds},
+      );
+    } on DioException catch (e) {
+      throw ApiException(_extractError(e, 'Failed to reorder segments'));
+    }
+  }
+
   Future<Map<String, dynamic>> exportVideo(String draftId, {String quality = '1080p', String format = 'mp4'}) async {
     try {
       final response = await _dio.post(

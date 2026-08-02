@@ -24,6 +24,7 @@ class _EditorScreenState extends State<EditorScreen> {
   String? _busySegmentId;
   String? _exportStatus;
   final Map<String, String> _aiStatus = {};
+  final Map<String, List<Map<String, dynamic>>> _stickersBySegment = {};
 
   @override
   void initState() {
@@ -38,7 +39,15 @@ class _EditorScreenState extends State<EditorScreen> {
     });
     try {
       final state = await _editorService.getEditorState(widget.draftId);
-      setState(() => _state = state);
+      final stickerEntries = await Future.wait(
+        state.segments.map((s) async => MapEntry(s.id, await _editorService.getStickers(s.id))),
+      );
+      setState(() {
+        _state = state;
+        _stickersBySegment
+          ..clear()
+          ..addEntries(stickerEntries);
+      });
     } catch (e) {
       setState(() => _error = e.toString());
     } finally {
@@ -94,6 +103,60 @@ class _EditorScreenState extends State<EditorScreen> {
       await _load();
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+    }
+  }
+
+  Future<void> _addSticker(EditorSegment segment) async {
+    final controller = TextEditingController();
+    final url = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Add sticker'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: 'Sticker image URL'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(context, controller.text), child: const Text('Add')),
+        ],
+      ),
+    );
+    if (url == null || url.isEmpty) return;
+    try {
+      await _editorService.addSticker(segment.id, url);
+      await _load();
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+    }
+  }
+
+  Future<void> _deleteSticker(String stickerId) async {
+    try {
+      await _editorService.deleteSticker(stickerId);
+      await _load();
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+    }
+  }
+
+  Future<void> _moveSegment(int index, int direction) async {
+    final segments = _state?.segments;
+    if (segments == null) return;
+    final newIndex = index + direction;
+    if (newIndex < 0 || newIndex >= segments.length) return;
+
+    setState(() {
+      final segment = segments.removeAt(index);
+      segments.insert(newIndex, segment);
+    });
+
+    try {
+      await _editorService.reorderSegments(widget.draftId, segments.map((s) => s.id).toList());
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      await _load();
     }
   }
 
@@ -173,8 +236,11 @@ class _EditorScreenState extends State<EditorScreen> {
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                     const SizedBox(height: 16),
-                    ...(_state?.segments ?? []).map((segment) {
+                    ...(_state?.segments ?? []).asMap().entries.map((entry) {
+                      final index = entry.key;
+                      final segment = entry.value;
                       final isBusy = _busySegmentId == segment.id;
+                      final stickers = _stickersBySegment[segment.id] ?? [];
                       return Card(
                         margin: const EdgeInsets.only(bottom: 12),
                         child: Padding(
@@ -189,9 +255,26 @@ class _EditorScreenState extends State<EditorScreen> {
                                     'Segment ${segment.order + 1} · ${segment.contentType}',
                                     style: const TextStyle(fontWeight: FontWeight.bold),
                                   ),
-                                  IconButton(
-                                    icon: const Icon(Icons.delete, color: Colors.red),
-                                    onPressed: isBusy ? null : () => _deleteSegment(segment),
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      IconButton(
+                                        icon: const Icon(Icons.arrow_upward),
+                                        onPressed: (isBusy || index == 0)
+                                            ? null
+                                            : () => _moveSegment(index, -1),
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(Icons.arrow_downward),
+                                        onPressed: (isBusy || index == (_state?.segments.length ?? 0) - 1)
+                                            ? null
+                                            : () => _moveSegment(index, 1),
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(Icons.delete, color: Colors.red),
+                                        onPressed: isBusy ? null : () => _deleteSegment(segment),
+                                      ),
+                                    ],
                                   ),
                                 ],
                               ),
@@ -229,8 +312,24 @@ class _EditorScreenState extends State<EditorScreen> {
                                     icon: const Icon(Icons.text_fields),
                                     label: const Text('Add text'),
                                   ),
+                                  TextButton.icon(
+                                    onPressed: () => _addSticker(segment),
+                                    icon: const Icon(Icons.emoji_emotions_outlined),
+                                    label: const Text('Add sticker'),
+                                  ),
                                 ],
                               ),
+                              if (stickers.isNotEmpty)
+                                Wrap(
+                                  spacing: 8,
+                                  children: stickers.map((sticker) {
+                                    return Chip(
+                                      label: Text(sticker['sticker_type'] as String? ?? 'sticker'),
+                                      deleteIcon: const Icon(Icons.close, size: 16),
+                                      onDeleted: () => _deleteSticker(sticker['id'] as String),
+                                    );
+                                  }).toList(),
+                                ),
                               Text(
                                 '${segment.startTime}ms - ${segment.endTime}ms',
                                 style: Theme.of(context).textTheme.bodySmall,
