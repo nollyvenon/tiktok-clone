@@ -79,6 +79,11 @@ export interface Video {
     thumbnail_url: string | null;
     user: PublicUser;
   } | null;
+  music: {
+    id: string;
+    sound_title: string;
+    artist: string | null;
+  } | null;
   created_at: string;
   published_at: string | null;
 }

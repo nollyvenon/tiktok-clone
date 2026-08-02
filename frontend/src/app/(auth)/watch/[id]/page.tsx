@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation } from 'react-query';
 import { videoApi, profileApi } from '@/lib/api';
-import { Loader2, AlertCircle, Heart, Share2, Bookmark, Repeat2, Scissors } from 'lucide-react';
+import { Loader2, AlertCircle, Heart, Share2, Bookmark, Repeat2, Scissors, Music } from 'lucide-react';
 import Link from 'next/link';
 import CommentSection from '@/components/features/CommentSection';
 import { VideoCard } from '@/components/features/VideoCard';
@@ -105,6 +105,17 @@ export default function WatchPage({ params }: WatchPageProps) {
                   <Scissors className="w-4 h-4" />
                 )}
                 {video.remix_type === 'duet' ? 'Duet with' : 'Stitch of'} @{video.original_video.user.username}
+              </Link>
+            )}
+
+            {video.music && (
+              <Link
+                href={`/sounds/${video.music.id}`}
+                className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 hover:text-pink-600 mb-3"
+              >
+                <Music className="w-4 h-4" />
+                {video.music.sound_title}
+                {video.music.artist && ` – ${video.music.artist}`}
               </Link>
             )}
 

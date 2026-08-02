@@ -5,7 +5,7 @@ import {
   Loader2, Trash2, Wand2, Scissors, Volume2, VolumeX, Type, Download, Sparkles,
   Smile, ArrowUp, ArrowDown, Mic, Music,
 } from 'lucide-react';
-import { editorApi, aiApi, type EditorState, type Segment, type Sticker, type SoundRecommendation } from '@/lib/api';
+import { editorApi, aiApi, uploadApi, type EditorState, type Segment, type Sticker, type SoundRecommendation } from '@/lib/api';
 
 interface EditPageProps {
   params: { draftId: string };
@@ -40,6 +40,9 @@ export default function EditPage({ params }: EditPageProps) {
         })
       );
       setStickersBySegment(Object.fromEntries(entries));
+
+      const draft = await uploadApi.getDraft(params.draftId);
+      if (draft.music_id) setSelectedSoundId(draft.music_id);
     } catch {
       setError('Failed to load editor state');
     } finally {
@@ -157,6 +160,19 @@ export default function EditPage({ params }: EditPageProps) {
   const [sounds, setSounds] = useState<SoundRecommendation[]>([]);
   const [soundsLoading, setSoundsLoading] = useState(false);
   const [soundsLoaded, setSoundsLoaded] = useState(false);
+  const [selectedSoundId, setSelectedSoundId] = useState<string | null>(null);
+  const [soundSaveError, setSoundSaveError] = useState<string | null>(null);
+
+  const handleUseSound = async (soundId: string) => {
+    setSoundSaveError(null);
+    try {
+      const draft = await uploadApi.getDraft(params.draftId);
+      await uploadApi.updateDraft(params.draftId, { ...draft, music_id: soundId });
+      setSelectedSoundId(soundId);
+    } catch {
+      setSoundSaveError('Failed to attach sound to this video');
+    }
+  };
 
   const handleGenerateVoiceover = async (segmentId: string) => {
     const text = window.prompt('Voiceover script');
@@ -489,19 +505,34 @@ export default function EditPage({ params }: EditPageProps) {
                   </button>
                 ))}
               </div>
+              {soundSaveError && (
+                <p className="text-xs text-red-600 mb-2">{soundSaveError}</p>
+              )}
               {sounds.length === 0 ? (
                 <p className="text-sm text-gray-500">No sounds found</p>
               ) : (
                 <div className="divide-y divide-gray-100 dark:divide-gray-800">
                   {sounds.map((sound) => (
-                    <div key={sound.id} className="py-3 flex items-center justify-between">
-                      <div>
-                        <p className="font-medium text-sm">{sound.sound_title}</p>
+                    <div key={sound.id} className="py-3 flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="font-medium text-sm truncate">{sound.sound_title}</p>
                         {sound.artist && <p className="text-xs text-gray-500">{sound.artist}</p>}
                       </div>
-                      {sound.is_trending && (
-                        <span className="text-xs text-orange-500 font-semibold">Trending</span>
-                      )}
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        {sound.is_trending && (
+                          <span className="text-xs text-orange-500 font-semibold">Trending</span>
+                        )}
+                        <button
+                          onClick={() => handleUseSound(sound.id)}
+                          className={`text-xs px-3 py-1 rounded-full font-semibold transition ${
+                            selectedSoundId === sound.id
+                              ? 'bg-pink-600 text-white'
+                              : 'bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700'
+                          }`}
+                        >
+                          {selectedSoundId === sound.id ? 'Using' : 'Use this sound'}
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>

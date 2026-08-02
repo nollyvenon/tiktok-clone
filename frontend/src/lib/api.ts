@@ -515,6 +515,29 @@ export const aiApi = {
     });
     return res.data;
   },
+
+  createSound: async (data: {
+    sound_url: string;
+    sound_title: string;
+    artist?: string;
+    category: string;
+    mood?: string;
+    genre?: string;
+    region?: string;
+    duration?: number;
+    license_type?: string;
+    credit_required?: string;
+  }) => {
+    const res = await client.post<SoundRecommendation>('/api/ai/sounds', data);
+    return res.data;
+  },
+
+  getVideosUsingSound: async (soundId: string, limit = 20, offset = 0) => {
+    const res = await client.get<FeedResponse>(`/api/ai/sounds/${soundId}/videos`, {
+      params: { limit, offset },
+    });
+    return res.data;
+  },
 };
 
 export interface SoundRecommendation {
