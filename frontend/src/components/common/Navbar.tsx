@@ -21,6 +21,7 @@ import {
   Compass,
   Sparkles,
   Bell,
+  Bookmark,
 } from 'lucide-react';
 
 export function Navbar() {
@@ -142,6 +143,13 @@ export function Navbar() {
                   <User className="w-4 h-4" />
                   <span>Profile</span>
                 </Link>
+                <Link
+                  href="/bookmarks"
+                  className="flex items-center gap-2 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700"
+                >
+                  <Bookmark className="w-4 h-4" />
+                  <span>Saved Videos</span>
+                </Link>
                 <button
                   onClick={handleLogout}
                   className="w-full flex items-center gap-2 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-b-lg text-red-600 dark:text-red-400"
@@ -198,6 +206,13 @@ export function Navbar() {
             >
               <User className="w-5 h-5" />
               <span>Profile</span>
+            </Link>
+            <Link
+              href="/bookmarks"
+              className="flex items-center gap-2 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded"
+            >
+              <Bookmark className="w-5 h-5" />
+              <span>Saved Videos</span>
             </Link>
             <button
               onClick={handleLogout}

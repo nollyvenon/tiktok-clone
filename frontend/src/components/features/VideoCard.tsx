@@ -10,9 +10,12 @@ import { Heart, MessageCircle, Share2, Bookmark } from 'lucide-react';
 interface VideoCardProps {
   video: Video;
   onVideoClick?: () => void;
+  /** Called after a successful bookmark toggle with the new state - lets
+   * pages like Saved Videos remove the card as soon as it's unsaved. */
+  onBookmarkChange?: (isBookmarked: boolean) => void;
 }
 
-export function VideoCard({ video, onVideoClick }: VideoCardProps) {
+export function VideoCard({ video, onVideoClick, onBookmarkChange }: VideoCardProps) {
   const [isLiked, setIsLiked] = useState(video.is_liked);
   const [isBookmarked, setIsBookmarked] = useState(video.is_bookmarked);
   const [likeCount, setLikeCount] = useState(video.likes_count);
@@ -27,6 +30,7 @@ export function VideoCard({ video, onVideoClick }: VideoCardProps) {
   const bookmarkMutation = useMutation(() => videoApi.toggleBookmark(video.id), {
     onSuccess: (result) => {
       setIsBookmarked(result.is_bookmarked);
+      onBookmarkChange?.(result.is_bookmarked);
     },
   });
 

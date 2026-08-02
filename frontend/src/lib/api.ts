@@ -594,6 +594,13 @@ export const videoApi = {
     });
     return res.data;
   },
+
+  getBookmarks: async (limit = 20, offset = 0) => {
+    const res = await client.get<FeedResponse>('/api/videos/bookmarks', {
+      params: { limit, offset },
+    });
+    return res.data;
+  },
 };
 
 // Comment endpoints
