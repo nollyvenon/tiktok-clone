@@ -233,7 +233,14 @@ export const uploadApi = {
   },
 
   createDraft: async (
-    data: { title?: string; description?: string; hashtags?: string; is_public?: boolean },
+    data: {
+      title?: string;
+      description?: string;
+      hashtags?: string;
+      is_public?: boolean;
+      original_video_id?: string;
+      remix_type?: 'duet' | 'stitch';
+    },
     uploadId?: string
   ) => {
     const res = await client.post('/api/uploads/drafts', data, {
@@ -598,6 +605,13 @@ export const videoApi = {
   getBookmarks: async (limit = 20, offset = 0) => {
     const res = await client.get<FeedResponse>('/api/videos/bookmarks', {
       params: { limit, offset },
+    });
+    return res.data;
+  },
+
+  getRemixes: async (videoId: string, remixType?: 'duet' | 'stitch', limit = 20, offset = 0) => {
+    const res = await client.get<FeedResponse>(`/api/videos/${videoId}/remixes`, {
+      params: { remix_type: remixType, limit, offset },
     });
     return res.data;
   },

@@ -3,9 +3,10 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation } from 'react-query';
 import { videoApi, profileApi } from '@/lib/api';
-import { Loader2, AlertCircle, Heart, Share2, Bookmark } from 'lucide-react';
+import { Loader2, AlertCircle, Heart, Share2, Bookmark, Repeat2, Scissors } from 'lucide-react';
 import Link from 'next/link';
 import CommentSection from '@/components/features/CommentSection';
+import { VideoCard } from '@/components/features/VideoCard';
 
 interface WatchPageProps {
   params: { id: string };
@@ -20,6 +21,12 @@ export default function WatchPage({ params }: WatchPageProps) {
   const { data: video, isLoading: videoLoading, error: videoError } = useQuery(
     ['video', params.id],
     () => videoApi.getVideo(params.id)
+  );
+
+  const { data: remixesData } = useQuery(
+    ['remixes', params.id],
+    () => videoApi.getRemixes(params.id),
+    { enabled: !!video }
   );
 
   useEffect(() => {
@@ -85,6 +92,21 @@ export default function WatchPage({ params }: WatchPageProps) {
                 className="w-full h-full"
               />
             </div>
+
+            {/* Duet/Stitch attribution */}
+            {video.original_video && (
+              <Link
+                href={`/watch/${video.original_video.id}`}
+                className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 hover:text-pink-600 mb-3"
+              >
+                {video.remix_type === 'duet' ? (
+                  <Repeat2 className="w-4 h-4" />
+                ) : (
+                  <Scissors className="w-4 h-4" />
+                )}
+                {video.remix_type === 'duet' ? 'Duet with' : 'Stitch of'} @{video.original_video.user.username}
+              </Link>
+            )}
 
             {/* Video Info */}
             <h1 className="text-2xl font-bold mb-2">{video.title}</h1>
@@ -157,7 +179,36 @@ export default function WatchPage({ params }: WatchPageProps) {
                 <Share2 className="w-5 h-5" />
                 <span>Share</span>
               </button>
+              {video.allow_duets && (
+                <Link
+                  href={`/create?originalVideoId=${video.id}&remixType=duet`}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition"
+                >
+                  <Repeat2 className="w-5 h-5" />
+                  <span>Duet</span>
+                </Link>
+              )}
+              {video.allow_stitches && (
+                <Link
+                  href={`/create?originalVideoId=${video.id}&remixType=stitch`}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition"
+                >
+                  <Scissors className="w-5 h-5" />
+                  <span>Stitch</span>
+                </Link>
+              )}
             </div>
+
+            {remixesData && remixesData.videos.length > 0 && (
+              <div className="mb-8">
+                <h2 className="text-xl font-bold mb-4">Duets &amp; Stitches</h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {remixesData.videos.map((remix) => (
+                    <VideoCard key={remix.id} video={remix} />
+                  ))}
+                </div>
+              </div>
+            )}
 
             <CommentSection videoId={params.id} videoOwnerId={video.user.id} />
           </div>

@@ -72,6 +72,13 @@ export interface Video {
   allow_comments: boolean;
   allow_duets: boolean;
   allow_stitches: boolean;
+  remix_type: 'duet' | 'stitch' | null;
+  original_video: {
+    id: string;
+    title: string | null;
+    thumbnail_url: string | null;
+    user: PublicUser;
+  } | null;
   created_at: string;
   published_at: string | null;
 }

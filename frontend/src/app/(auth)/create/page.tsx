@@ -1,15 +1,26 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { Upload, X, Loader2, AlertCircle } from 'lucide-react';
+import { Suspense, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Upload, X, Loader2, AlertCircle, Repeat2, Scissors } from 'lucide-react';
 import axios from 'axios';
 import { uploadApi } from '@/lib/api';
 
 type Stage = 'idle' | 'requesting-url' | 'uploading' | 'finalizing' | 'creating-draft' | 'done';
 
 export default function CreatePage() {
+  return (
+    <Suspense fallback={null}>
+      <CreatePageContent />
+    </Suspense>
+  );
+}
+
+function CreatePageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const originalVideoId = searchParams.get('originalVideoId') || undefined;
+  const remixType = searchParams.get('remixType') as 'duet' | 'stitch' | null;
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string>('');
   const [title, setTitle] = useState('');
@@ -72,7 +83,12 @@ export default function CreatePage() {
       // 4. Create a draft tied to this upload, then publish it immediately
       setStage('creating-draft');
       const draft = await uploadApi.createDraft(
-        { title, description, is_public: isPublic },
+        {
+          title,
+          description,
+          is_public: isPublic,
+          ...(originalVideoId && remixType ? { original_video_id: originalVideoId, remix_type: remixType } : {}),
+        },
         upload_id
       );
       await uploadApi.publishDraft(draft.id);
@@ -101,7 +117,16 @@ export default function CreatePage() {
   return (
     <div className="min-h-screen bg-white dark:bg-gray-900 py-8">
       <div className="max-w-2xl mx-auto px-4">
-        <h1 className="text-3xl font-bold mb-8">Upload a video</h1>
+        <h1 className="text-3xl font-bold mb-2">Upload a video</h1>
+        {originalVideoId && remixType && (
+          <p className="text-sm text-gray-500 mb-6 flex items-center gap-1.5">
+            {remixType === 'duet' ? <Repeat2 className="w-4 h-4" /> : <Scissors className="w-4 h-4" />}
+            Uploading a {remixType} response to{' '}
+            <a href={`/watch/${originalVideoId}`} className="text-pink-600 hover:underline">
+              this video
+            </a>
+          </p>
+        )}
 
         {error && (
           <div className="mb-6 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 flex gap-2">
