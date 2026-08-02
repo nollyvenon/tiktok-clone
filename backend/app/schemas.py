@@ -7,7 +7,9 @@ from typing import Optional, List
 from datetime import datetime
 from uuid import UUID
 
-from app.models import UserRole, RemixType
+from app.models import (
+    UserRole, RemixType, ReportedContentType, ReportReason, ReportStatus, ModerationActionType,
+)
 
 
 # ============================================================================
@@ -1342,6 +1344,62 @@ class ConversationListResponse(BaseModel):
     """Paginated list of the current user's conversations"""
     conversations: List[ConversationResponse]
     total: int
+
+
+# ============================================================================
+# Moderation Schemas
+# ============================================================================
+
+class ContentReportCreate(BaseModel):
+    """Submit a content report"""
+    content_type: ReportedContentType
+    content_id: UUID
+    reason: ReportReason
+    description: Optional[str] = Field(None, max_length=1000)
+
+
+class ContentReportResponse(BaseModel):
+    """A submitted report"""
+    id: UUID
+    reporter_id: UUID
+    content_type: ReportedContentType
+    reported_video_id: Optional[UUID] = None
+    reported_comment_id: Optional[UUID] = None
+    reported_user_id: Optional[UUID] = None
+    reason: ReportReason
+    description: Optional[str] = None
+    status: ReportStatus
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class ContentReportListResponse(BaseModel):
+    """Paginated list of reports (admin queue)"""
+    reports: List[ContentReportResponse]
+    total: int
+    limit: int
+    offset: int
+
+
+class ModerationDecisionCreate(BaseModel):
+    """An admin's decision on a report"""
+    action: ModerationActionType
+    notes: Optional[str] = Field(None, max_length=1000)
+
+
+class ModerationDecisionResponse(BaseModel):
+    """A logged moderation decision"""
+    id: UUID
+    report_id: UUID
+    moderator_id: UUID
+    action: ModerationActionType
+    notes: Optional[str] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
 
 
 # ============================================================================

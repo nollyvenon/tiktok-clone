@@ -2,7 +2,7 @@
 Database models for the TikTok Clone application
 """
 
-from sqlalchemy import Column, String, Boolean, DateTime, Text, Integer, ForeignKey, Enum, UniqueConstraint, Float
+from sqlalchemy import Column, String, Boolean, DateTime, Text, Integer, ForeignKey, Enum, UniqueConstraint, Float, CheckConstraint
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
 from datetime import datetime, timedelta
@@ -1187,4 +1187,103 @@ class NotificationPreference(Base):
     quiet_hours_enabled = Column(Boolean, default=False, nullable=False)
 
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+# ============================================================================
+# MODULE 26: MODERATION
+# ============================================================================
+
+class ReportedContentType(str, enum.Enum):
+    """What kind of content a report targets"""
+    VIDEO = "video"
+    COMMENT = "comment"
+    USER = "user"
+
+
+class ReportReason(str, enum.Enum):
+    """Why content was reported"""
+    SPAM = "spam"
+    HARASSMENT = "harassment"
+    NUDITY = "nudity"
+    VIOLENCE = "violence"
+    HATE_SPEECH = "hate_speech"
+    MISINFORMATION = "misinformation"
+    SELF_HARM = "self_harm"
+    OTHER = "other"
+
+
+class ReportStatus(str, enum.Enum):
+    """Lifecycle of a content report"""
+    PENDING = "pending"
+    ACTIONED = "actioned"
+    DISMISSED = "dismissed"
+
+
+class ModerationActionType(str, enum.Enum):
+    """What a moderator did in response to a report"""
+    DISMISS = "dismiss"
+    REMOVE_CONTENT = "remove_content"
+    WARN_USER = "warn_user"
+    SUSPEND_USER = "suspend_user"
+    BAN_USER = "ban_user"
+
+
+class ContentReport(Base):
+    """
+    A user-submitted report against a video, comment, or user. Exactly one
+    of reported_video_id/reported_comment_id/reported_user_id is set,
+    matching content_type - enforced by a CHECK constraint rather than a
+    single polymorphic FK, since SQLAlchemy/Postgres have no native
+    polymorphic foreign key.
+    """
+    __tablename__ = "content_reports"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    reporter_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    # values_callable: store the enum's lowercase .value ("video") rather
+    # than SQLAlchemy's Enum-column default of the uppercase Python member
+    # .name ("VIDEO") - the CHECK constraint below does raw-SQL string
+    # comparison against .value, and without this it silently compares
+    # against the wrong casing and fails on every insert.
+    content_type = Column(
+        Enum(ReportedContentType, values_callable=lambda e: [x.value for x in e]),
+        nullable=False, index=True,
+    )
+    reported_video_id = Column(UUID(as_uuid=True), ForeignKey("videos.id", ondelete="CASCADE"), nullable=True, index=True)
+    reported_comment_id = Column(UUID(as_uuid=True), ForeignKey("comments.id", ondelete="CASCADE"), nullable=True, index=True)
+    reported_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True)
+
+    reason = Column(Enum(ReportReason, values_callable=lambda e: [x.value for x in e]), nullable=False)
+    description = Column(Text, nullable=True)
+
+    status = Column(
+        Enum(ReportStatus, values_callable=lambda e: [x.value for x in e]),
+        default=ReportStatus.PENDING, nullable=False, index=True,
+    )
+
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+
+    __table_args__ = (
+        CheckConstraint(
+            "(content_type = 'video' AND reported_video_id IS NOT NULL AND reported_comment_id IS NULL AND reported_user_id IS NULL) OR "
+            "(content_type = 'comment' AND reported_comment_id IS NOT NULL AND reported_video_id IS NULL AND reported_user_id IS NULL) OR "
+            "(content_type = 'user' AND reported_user_id IS NOT NULL AND reported_video_id IS NULL AND reported_comment_id IS NULL)",
+            name="ck_content_report_single_target",
+        ),
+    )
+
+
+class ModerationDecision(Base):
+    """A moderator's decision on a content report - the audit trail"""
+    __tablename__ = "moderation_decisions"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    report_id = Column(UUID(as_uuid=True), ForeignKey("content_reports.id", ondelete="CASCADE"), nullable=False, index=True)
+    moderator_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    action = Column(Enum(ModerationActionType, values_callable=lambda e: [x.value for x in e]), nullable=False)
+    notes = Column(Text, nullable=True)
+
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)

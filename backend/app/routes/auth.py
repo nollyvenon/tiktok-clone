@@ -19,7 +19,7 @@ from app.schemas import (
 from app.services.auth import AuthService
 from app.services.oauth import OAuthService, OAuthProviderConfig
 from app.security import verify_token
-from app.models import User
+from app.models import User, UserRole
 
 SUPPORTED_OAUTH_PROVIDERS = {"google", "facebook", "tiktok"}
 
@@ -83,6 +83,14 @@ async def get_optional_current_user(
     if not authorization:
         return None
     return await get_current_user(authorization, db)
+
+
+async def require_admin(current_user: User = Depends(get_current_user)) -> User:
+    """Dependency for admin-only routes - UserRole.ADMIN existed on the
+    model but was never actually enforced anywhere before Module 26."""
+    if current_user.role != UserRole.ADMIN:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
+    return current_user
 
 
 # ============================================================================
