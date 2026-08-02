@@ -17,7 +17,7 @@ from app.schemas import (
 from app.services.videos import VideoService
 from app.services.profiles import ProfileService
 from app.services.notifications import NotificationService
-from app.routes.auth import get_current_user
+from app.routes.auth import get_current_user, get_optional_current_user
 from app.models import User, NotificationType
 
 logger = logging.getLogger(__name__)
@@ -40,7 +40,7 @@ async def get_feed(
     feed_type: str = Query("for_you", description="'for_you' or 'following'"),
     limit: int = Query(10, ge=1, le=50),
     offset: int = Query(0, ge=0),
-    current_user: Optional[User] = Depends(lambda auth=Header(None), db=Depends(get_db): get_current_user(auth, db) if auth else None),
+    current_user: Optional[User] = Depends(get_optional_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -257,7 +257,7 @@ async def search_videos(
 )
 async def get_video(
     video_id: UUID,
-    current_user: Optional[User] = Depends(lambda auth=Header(None), db=Depends(get_db): get_current_user(auth, db) if auth else None),
+    current_user: Optional[User] = Depends(get_optional_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -601,7 +601,7 @@ async def bookmark_video(
 async def track_view(
     video_id: UUID,
     request: ViewTrackingRequest,
-    current_user: Optional[User] = Depends(lambda auth=Header(None), db=Depends(get_db): get_current_user(auth, db) if auth else None),
+    current_user: Optional[User] = Depends(get_optional_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """

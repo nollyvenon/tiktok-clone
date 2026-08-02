@@ -108,3 +108,4 @@ mobile/.dart_tool/*
 
 backend/app/__pycache__/*
 *.pyc
+backend/app/__pycache__/

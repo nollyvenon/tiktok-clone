@@ -4,7 +4,7 @@ Profile service for user profile management
 
 from datetime import datetime
 from typing import Optional, Tuple
-from sqlalchemy import select, and_, desc
+from sqlalchemy import select, and_, desc, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
 import logging
@@ -193,7 +193,7 @@ class ProfileService:
         offset: int = 0,
     ) -> Tuple[list[User], int]:
         """
-        Get user followers
+        Get user followers, most recently followed first
 
         Args:
             db: Database session
@@ -206,14 +206,14 @@ class ProfileService:
         """
         # Get total count
         count_result = await db.execute(
-            select(Follow).where(
+            select(func.count()).select_from(Follow).where(
                 and_(
                     Follow.following_id == user_id,
                     Follow.is_active == True,
                 )
             )
         )
-        total = len(count_result.scalars().all())
+        total = count_result.scalar() or 0
 
         # Get paginated results
         result = await db.execute(
@@ -226,12 +226,13 @@ class ProfileService:
         )
         follows = result.scalars().all()
 
-        # Get users
+        # Get users, preserving the followed-at ordering from the Follow query
         follower_ids = [f.follower_id for f in follows]
         users_result = await db.execute(
             select(User).where(User.id.in_(follower_ids))
         )
-        users = users_result.scalars().all()
+        users_by_id = {u.id: u for u in users_result.scalars().all()}
+        users = [users_by_id[fid] for fid in follower_ids if fid in users_by_id]
 
         return users, total
 
@@ -243,7 +244,7 @@ class ProfileService:
         offset: int = 0,
     ) -> Tuple[list[User], int]:
         """
-        Get users that user is following
+        Get users that user is following, most recently followed first
 
         Args:
             db: Database session
@@ -256,14 +257,14 @@ class ProfileService:
         """
         # Get total count
         count_result = await db.execute(
-            select(Follow).where(
+            select(func.count()).select_from(Follow).where(
                 and_(
                     Follow.follower_id == user_id,
                     Follow.is_active == True,
                 )
             )
         )
-        total = len(count_result.scalars().all())
+        total = count_result.scalar() or 0
 
         # Get paginated results
         result = await db.execute(
@@ -276,14 +277,59 @@ class ProfileService:
         )
         follows = result.scalars().all()
 
-        # Get users
+        # Get users, preserving the followed-at ordering from the Follow query
         following_ids = [f.following_id for f in follows]
         users_result = await db.execute(
             select(User).where(User.id.in_(following_ids))
         )
-        users = users_result.scalars().all()
+        users_by_id = {u.id: u for u in users_result.scalars().all()}
+        users = [users_by_id[fid] for fid in following_ids if fid in users_by_id]
 
         return users, total
+
+    @staticmethod
+    async def get_mutual_follow_status(
+        db: AsyncSession,
+        viewer_id: UUID,
+        user_ids: list[UUID],
+    ) -> dict[UUID, Tuple[bool, bool]]:
+        """
+        For a list of user IDs, determine whether the viewer follows each
+        one and whether each one follows the viewer back - in two batch
+        queries rather than one round trip per row.
+
+        Returns:
+            Dict of user_id -> (viewer_follows_them, they_follow_viewer)
+        """
+        if not user_ids:
+            return {}
+
+        viewer_follows_result = await db.execute(
+            select(Follow.following_id).where(
+                and_(
+                    Follow.follower_id == viewer_id,
+                    Follow.following_id.in_(user_ids),
+                    Follow.is_active == True,
+                )
+            )
+        )
+        viewer_follows = set(viewer_follows_result.scalars().all())
+
+        follows_viewer_result = await db.execute(
+            select(Follow.follower_id).where(
+                and_(
+                    Follow.following_id == viewer_id,
+                    Follow.follower_id.in_(user_ids),
+                    Follow.is_active == True,
+                )
+            )
+        )
+        follows_viewer = set(follows_viewer_result.scalars().all())
+
+        return {
+            uid: (uid in viewer_follows, uid in follows_viewer)
+            for uid in user_ids
+        }
 
     @staticmethod
     async def is_following(

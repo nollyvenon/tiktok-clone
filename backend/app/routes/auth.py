@@ -70,6 +70,21 @@ async def get_current_user(
     return user
 
 
+async def get_optional_current_user(
+    authorization: str = Header(None),
+    db: AsyncSession = Depends(get_db),
+) -> Optional[User]:
+    """
+    Dependency for routes that behave differently for authenticated vs.
+    anonymous requests without requiring auth. Must be a real async def -
+    a sync lambda calling `get_current_user(...)` here would return an
+    un-awaited coroutine instead of a User, since lambdas can't be async.
+    """
+    if not authorization:
+        return None
+    return await get_current_user(authorization, db)
+
+
 # ============================================================================
 # Public Routes
 # ============================================================================
@@ -561,7 +576,7 @@ async def change_password(
 async def send_otp(
     request: SendOTPRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: Optional[User] = Depends(lambda auth=Header(None), db=Depends(get_db): get_current_user(auth, db) if auth else None),
+    current_user: Optional[User] = Depends(get_optional_current_user),
 ):
     """
     Send OTP code for phone/email verification
@@ -608,7 +623,7 @@ async def send_otp(
 async def verify_otp(
     request: VerifyOTPRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: Optional[User] = Depends(lambda auth=Header(None), db=Depends(get_db): get_current_user(auth, db) if auth else None),
+    current_user: Optional[User] = Depends(get_optional_current_user),
 ):
     """
     Verify OTP code

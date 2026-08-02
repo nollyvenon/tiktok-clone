@@ -12,6 +12,7 @@ from sqlalchemy import select, func, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Comment, CommentLike, Video
+from app.services.profiles import ProfileService
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +42,12 @@ class CommentService:
             raise ValueError("Video not found")
         if not video.allow_comments:
             raise ValueError("Comments are disabled for this video")
+
+        if video.user_id != user_id and (
+            await ProfileService.is_blocked(db, video.user_id, user_id)
+            or await ProfileService.is_blocked(db, user_id, video.user_id)
+        ):
+            raise ValueError("You cannot comment on this video")
 
         if parent_comment_id is not None:
             parent = await db.get(Comment, parent_comment_id)

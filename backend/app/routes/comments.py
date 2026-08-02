@@ -2,14 +2,14 @@
 Comment API routes
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Header, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
 from uuid import UUID
 import logging
 
 from app.database import get_db
-from app.routes.auth import get_current_user
+from app.routes.auth import get_current_user, get_optional_current_user
 from app.models import User, NotificationType
 from app.services.comments import CommentService
 from app.services.profiles import ProfileService
@@ -54,14 +54,6 @@ async def _build_comment_response(
     )
 
 
-async def _get_optional_user(
-    authorization: str = Header(None), db: AsyncSession = Depends(get_db)
-) -> Optional[User]:
-    if not authorization:
-        return None
-    return await get_current_user(authorization, db)
-
-
 @router.get(
     "/videos/{video_id}/comments",
     response_model=CommentListResponse,
@@ -71,7 +63,7 @@ async def get_video_comments(
     video_id: UUID,
     limit: int = Query(20, ge=1, le=100),
     offset: int = Query(0, ge=0),
-    current_user: Optional[User] = Depends(_get_optional_user),
+    current_user: Optional[User] = Depends(get_optional_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Get top-level comments for a video, pinned comments first"""
@@ -151,7 +143,7 @@ async def get_comment_replies(
     comment_id: UUID,
     limit: int = Query(20, ge=1, le=100),
     offset: int = Query(0, ge=0),
-    current_user: Optional[User] = Depends(_get_optional_user),
+    current_user: Optional[User] = Depends(get_optional_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Get replies to a comment, oldest first"""

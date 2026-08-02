@@ -246,16 +246,30 @@ class FollowResponse(BaseModel):
     following_count: int
 
 
+class FollowListUser(BaseModel):
+    """A user in a followers/following list, with mutual-follow context"""
+    id: UUID
+    username: str
+    avatar_url: Optional[str] = None
+    is_verified: bool
+    is_creator: bool
+    is_following: bool = False
+    is_followed_by: bool = False
+
+    class Config:
+        from_attributes = True
+
+
 class FollowersResponse(BaseModel):
     """List of followers"""
-    users: list[UserPublicProfile]
+    users: list[FollowListUser]
     total: int
     cursor: Optional[str] = None
 
 
 class FollowingResponse(BaseModel):
     """List of following"""
-    users: list[UserPublicProfile]
+    users: list[FollowListUser]
     total: int
     cursor: Optional[str] = None
 

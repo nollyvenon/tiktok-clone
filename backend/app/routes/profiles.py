@@ -11,12 +11,12 @@ from uuid import UUID
 from app.database import get_db
 from app.schemas import (
     UserFullProfile, UserProfileUpdate, ProfileResponse, ProfileStatistics,
-    FollowResponse, FollowersResponse, FollowingResponse, BlockResponse,
+    FollowResponse, FollowersResponse, FollowingResponse, FollowListUser, BlockResponse,
     BlockedUsersResponse, UserPublicProfile, ErrorResponse
 )
 from app.services.profiles import ProfileService
 from app.services.notifications import NotificationService
-from app.routes.auth import get_current_user
+from app.routes.auth import get_current_user, get_optional_current_user
 from app.models import User, NotificationType
 
 logger = logging.getLogger(__name__)
@@ -39,7 +39,7 @@ router = APIRouter(prefix="/profiles", tags=["Profiles"])
 async def get_user_profile(
     user_id: UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: Optional[User] = Depends(lambda auth=Header(None), db=Depends(get_db): get_current_user(auth, db) if auth else None),
+    current_user: Optional[User] = Depends(get_optional_current_user),
 ):
     """
     Get user profile by ID
@@ -102,7 +102,7 @@ async def get_user_profile(
 async def get_user_profile_by_username(
     username: str,
     db: AsyncSession = Depends(get_db),
-    current_user: Optional[User] = Depends(lambda auth=Header(None), db=Depends(get_db): get_current_user(auth, db) if auth else None),
+    current_user: Optional[User] = Depends(get_optional_current_user),
 ):
     """
     Get user profile by username
@@ -275,6 +275,7 @@ async def get_followers(
     limit: int = 20,
     offset: int = 0,
     db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_current_user),
 ):
     """
     Get user followers list
@@ -284,14 +285,28 @@ async def get_followers(
     - limit: Number of results (default 20)
     - offset: Pagination offset (default 0)
 
-    **Returns:** List of followers with total count
+    **Returns:** List of followers with total count, and (if authenticated)
+    per-user is_following/is_followed_by mutual-follow flags relative to
+    the requesting user
     """
     try:
         followers, total = await ProfileService.get_followers(
             db, user_id, limit=limit, offset=offset
         )
+        mutual = {}
+        if current_user:
+            mutual = await ProfileService.get_mutual_follow_status(
+                db, current_user.id, [u.id for u in followers]
+            )
         return FollowersResponse(
-            users=[UserPublicProfile.from_orm(u) for u in followers],
+            users=[
+                FollowListUser(
+                    **UserPublicProfile.from_orm(u).dict(),
+                    is_following=mutual.get(u.id, (False, False))[0],
+                    is_followed_by=mutual.get(u.id, (False, False))[1],
+                )
+                for u in followers
+            ],
             total=total,
         )
     except Exception as e:
@@ -315,6 +330,7 @@ async def get_following(
     limit: int = 20,
     offset: int = 0,
     db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_current_user),
 ):
     """
     Get users that user is following
@@ -324,14 +340,28 @@ async def get_following(
     - limit: Number of results (default 20)
     - offset: Pagination offset (default 0)
 
-    **Returns:** List of following with total count
+    **Returns:** List of following with total count, and (if authenticated)
+    per-user is_following/is_followed_by mutual-follow flags relative to
+    the requesting user
     """
     try:
         following, total = await ProfileService.get_following(
             db, user_id, limit=limit, offset=offset
         )
+        mutual = {}
+        if current_user:
+            mutual = await ProfileService.get_mutual_follow_status(
+                db, current_user.id, [u.id for u in following]
+            )
         return FollowingResponse(
-            users=[UserPublicProfile.from_orm(u) for u in following],
+            users=[
+                FollowListUser(
+                    **UserPublicProfile.from_orm(u).dict(),
+                    is_following=mutual.get(u.id, (False, False))[0],
+                    is_followed_by=mutual.get(u.id, (False, False))[1],
+                )
+                for u in following
+            ],
             total=total,
         )
     except Exception as e:

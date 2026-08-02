@@ -458,6 +458,30 @@ async def test_reply_notifies_parent_author_not_video_owner(
 
 
 @pytest.mark.asyncio
+async def test_blocked_user_cannot_comment(test_client: AsyncClient, test_db, register_user_data):
+    creator_token, creator_id = await _register(
+        test_client, register_user_data, "blockcomment1@example.com", "blockcomment1user"
+    )
+    blocked_token, blocked_id = await _register(
+        test_client, register_user_data, "blockcomment2@example.com", "blockcomment2user"
+    )
+    video = await _make_video(test_db, creator_id)
+
+    block_response = await test_client.post(
+        f"/api/profiles/{blocked_id}/block", headers={"Authorization": f"Bearer {creator_token}"}
+    )
+    assert block_response.status_code == 200
+    assert block_response.json()["is_blocked"] is True
+
+    response = await test_client.post(
+        f"/api/videos/{video.id}/comments",
+        json={"content": "Trying to comment"},
+        headers={"Authorization": f"Bearer {blocked_token}"},
+    )
+    assert response.status_code == 400
+
+
+@pytest.mark.asyncio
 async def test_self_comment_does_not_notify_self(test_client: AsyncClient, test_db, register_user_data):
     token, user_id = await _register(test_client, register_user_data, "notify6@example.com", "notify6user")
     video = await _make_video(test_db, user_id)

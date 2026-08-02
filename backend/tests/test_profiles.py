@@ -286,5 +286,68 @@ async def test_get_blocked_users(test_client: AsyncClient, register_user_data):
     assert data["users"][0]["id"] == user2_id
 
 
+async def _register(test_client: AsyncClient, register_user_data, email, username):
+    data = dict(register_user_data)
+    data["email"] = email
+    data["username"] = username
+    response = await test_client.post("/api/auth/register", json=data)
+    return response.json()["access_token"], response.json()["user"]["id"]
+
+
+@pytest.mark.asyncio
+async def test_followers_list_mutual_follow_flags(test_client: AsyncClient, register_user_data):
+    """The followers list should mark which followers the viewer already
+    follows back, and which follow the viewer (mutual detection)."""
+    token_owner, owner_id = await _register(test_client, register_user_data, "mutual1@example.com", "mutual1user")
+    token_a, user_a_id = await _register(test_client, register_user_data, "mutual2@example.com", "mutual2user")
+    token_b, user_b_id = await _register(test_client, register_user_data, "mutual3@example.com", "mutual3user")
+
+    # A and B both follow owner
+    await test_client.post(f"/api/profiles/{owner_id}/follow", headers={"Authorization": f"Bearer {token_a}"})
+    await test_client.post(f"/api/profiles/{owner_id}/follow", headers={"Authorization": f"Bearer {token_b}"})
+    # owner follows back A only
+    await test_client.post(f"/api/profiles/{user_a_id}/follow", headers={"Authorization": f"Bearer {token_owner}"})
+
+    response = await test_client.get(
+        f"/api/profiles/{owner_id}/followers", headers={"Authorization": f"Bearer {token_owner}"}
+    )
+    assert response.status_code == 200
+    users = {u["id"]: u for u in response.json()["users"]}
+    assert users[user_a_id]["is_following"] is True  # owner follows A back
+    assert users[user_a_id]["is_followed_by"] is True  # A follows owner
+    assert users[user_b_id]["is_following"] is False  # owner does not follow B back
+    assert users[user_b_id]["is_followed_by"] is True  # B follows owner
+
+
+@pytest.mark.asyncio
+async def test_followers_list_anonymous_has_no_mutual_flags(test_client: AsyncClient, register_user_data):
+    token_owner, owner_id = await _register(test_client, register_user_data, "anonmutual1@example.com", "anonmutual1user")
+    token_a, user_a_id = await _register(test_client, register_user_data, "anonmutual2@example.com", "anonmutual2user")
+
+    await test_client.post(f"/api/profiles/{owner_id}/follow", headers={"Authorization": f"Bearer {token_a}"})
+
+    response = await test_client.get(f"/api/profiles/{owner_id}/followers")
+    assert response.status_code == 200
+    user = response.json()["users"][0]
+    assert user["is_following"] is False
+    assert user["is_followed_by"] is False
+
+
+@pytest.mark.asyncio
+async def test_followers_list_ordered_most_recent_first(test_client: AsyncClient, register_user_data):
+    """Followers should be ordered by most-recently-followed first, and the
+    user objects must match that order (not an unrelated DB fetch order)."""
+    _, owner_id = await _register(test_client, register_user_data, "order1@example.com", "order1user")
+    token_a, user_a_id = await _register(test_client, register_user_data, "order2@example.com", "order2user")
+    token_b, user_b_id = await _register(test_client, register_user_data, "order3@example.com", "order3user")
+
+    await test_client.post(f"/api/profiles/{owner_id}/follow", headers={"Authorization": f"Bearer {token_a}"})
+    await test_client.post(f"/api/profiles/{owner_id}/follow", headers={"Authorization": f"Bearer {token_b}"})
+
+    response = await test_client.get(f"/api/profiles/{owner_id}/followers")
+    users = response.json()["users"]
+    assert [u["id"] for u in users] == [user_b_id, user_a_id]
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "-s"])

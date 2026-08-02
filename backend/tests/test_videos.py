@@ -80,6 +80,44 @@ async def test_get_video(test_client: AsyncClient, register_user_data):
 
 
 @pytest.mark.asyncio
+async def test_get_video_reflects_own_like_and_bookmark_when_authenticated(
+    test_client: AsyncClient, register_user_data
+):
+    """GET /videos/{id} must recognize the requesting user via the
+    Authorization header and reflect their real is_liked/is_bookmarked
+    state - not silently treat every request as anonymous."""
+    response = await test_client.post("/api/auth/register", json=register_user_data)
+    access_token = response.json()["access_token"]
+
+    video_data = {"title": "Auth check video", "video_url": "https://example.com/authcheck.mp4"}
+    create_response = await test_client.post(
+        "/api/videos", json=video_data, headers={"Authorization": f"Bearer {access_token}"}
+    )
+    video_id = create_response.json()["id"]
+
+    await test_client.post(
+        f"/api/videos/{video_id}/like", headers={"Authorization": f"Bearer {access_token}"}
+    )
+    await test_client.post(
+        f"/api/videos/{video_id}/bookmark", headers={"Authorization": f"Bearer {access_token}"}
+    )
+
+    response = await test_client.get(
+        f"/api/videos/{video_id}", headers={"Authorization": f"Bearer {access_token}"}
+    )
+    assert response.status_code == 200
+    video = response.json()
+    assert video["is_liked"] is True
+    assert video["is_bookmarked"] is True
+
+    # Anonymous request must not see any liked/bookmarked state
+    anon_response = await test_client.get(f"/api/videos/{video_id}")
+    anon_video = anon_response.json()
+    assert anon_video["is_liked"] is False
+    assert anon_video["is_bookmarked"] is False
+
+
+@pytest.mark.asyncio
 async def test_get_feed(test_client: AsyncClient, register_user_data):
     """Test getting video feed"""
     # Create videos
@@ -104,6 +142,78 @@ async def test_get_feed(test_client: AsyncClient, register_user_data):
 
     assert "videos" in feed
     assert len(feed["videos"]) > 0
+
+
+async def _register_and_login(test_client, register_user_data, email, username):
+    data = dict(register_user_data)
+    data["email"] = email
+    data["username"] = username
+    response = await test_client.post("/api/auth/register", json=data)
+    return response.json()["access_token"], response.json()["user"]["id"]
+
+
+@pytest.mark.asyncio
+async def test_following_feed_only_shows_followed_creators(test_client: AsyncClient, register_user_data):
+    """feed_type=following must actually filter to videos from creators the
+    requesting user follows - this silently degraded to the same as
+    for_you for every user until the optional-auth dependency bug (current
+    user never recognized) was fixed."""
+    viewer_token, viewer_id = await _register_and_login(
+        test_client, register_user_data, "feedviewer@example.com", "feedvieweruser"
+    )
+    followed_token, followed_id = await _register_and_login(
+        test_client, register_user_data, "feedfollowed@example.com", "feedfolloweduser"
+    )
+    stranger_token, stranger_id = await _register_and_login(
+        test_client, register_user_data, "feedstranger@example.com", "feedstrangeruser"
+    )
+
+    await test_client.post(
+        f"/api/profiles/{followed_id}/follow", headers={"Authorization": f"Bearer {viewer_token}"}
+    )
+
+    followed_video = await test_client.post(
+        "/api/videos",
+        json={"title": "From followed creator", "video_url": "https://example.com/followed.mp4"},
+        headers={"Authorization": f"Bearer {followed_token}"},
+    )
+    await test_client.post(
+        "/api/videos",
+        json={"title": "From a stranger", "video_url": "https://example.com/stranger.mp4"},
+        headers={"Authorization": f"Bearer {stranger_token}"},
+    )
+
+    response = await test_client.get(
+        "/api/videos/feed",
+        params={"feed_type": "following"},
+        headers={"Authorization": f"Bearer {viewer_token}"},
+    )
+    assert response.status_code == 200
+    video_ids = [v["id"] for v in response.json()["videos"]]
+    assert followed_video.json()["id"] in video_ids
+    assert all(v["user"]["id"] == followed_id for v in response.json()["videos"])
+
+
+@pytest.mark.asyncio
+async def test_feed_reflects_like_state_when_authenticated(test_client: AsyncClient, register_user_data):
+    access_token, _ = await _register_and_login(
+        test_client, register_user_data, "feedlike@example.com", "feedlikeuser"
+    )
+    create_response = await test_client.post(
+        "/api/videos",
+        json={"title": "Feed like check", "video_url": "https://example.com/feedlike.mp4"},
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    video_id = create_response.json()["id"]
+    await test_client.post(
+        f"/api/videos/{video_id}/like", headers={"Authorization": f"Bearer {access_token}"}
+    )
+
+    response = await test_client.get(
+        "/api/videos/feed", headers={"Authorization": f"Bearer {access_token}"}
+    )
+    video = next(v for v in response.json()["videos"] if v["id"] == video_id)
+    assert video["is_liked"] is True
 
 
 @pytest.mark.asyncio
