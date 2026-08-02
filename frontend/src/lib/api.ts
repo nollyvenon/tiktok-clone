@@ -160,21 +160,23 @@ export const profileApi = {
   },
 
   getFollowers: async (userId: string, limit = 20, offset = 0) => {
-    const res = await client.get(`/api/profiles/${userId}/followers`, {
+    const res = await client.get<FollowListResult>(`/api/profiles/${userId}/followers`, {
       params: { limit, offset },
     });
     return res.data;
   },
 
   getFollowing: async (userId: string, limit = 20, offset = 0) => {
-    const res = await client.get(`/api/profiles/${userId}/following`, {
+    const res = await client.get<FollowListResult>(`/api/profiles/${userId}/following`, {
       params: { limit, offset },
     });
     return res.data;
   },
 
   blockUser: async (userId: string) => {
-    const res = await client.post(`/api/profiles/${userId}/block`);
+    const res = await client.post<{ is_blocked: boolean; message: string }>(
+      `/api/profiles/${userId}/block`
+    );
     return res.data;
   },
 
@@ -183,6 +185,21 @@ export const profileApi = {
     return res.data;
   },
 };
+
+export interface FollowListUser {
+  id: string;
+  username: string;
+  avatar_url: string | null;
+  is_verified: boolean;
+  is_creator: boolean;
+  is_following: boolean;
+  is_followed_by: boolean;
+}
+
+export interface FollowListResult {
+  users: FollowListUser[];
+  total: number;
+}
 
 // Upload & Draft endpoints
 export const uploadApi = {

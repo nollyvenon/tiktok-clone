@@ -5,7 +5,7 @@ import { useQuery, useMutation } from 'react-query';
 import Link from 'next/link';
 import { profileApi, videoApi } from '@/lib/api';
 import { VideoCard } from '@/components/features/VideoCard';
-import { Loader2, AlertCircle, MessageCircle, SlidersHorizontal } from 'lucide-react';
+import { Loader2, AlertCircle, MessageCircle, SlidersHorizontal, MoreVertical, Ban } from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
 
 interface ProfilePageProps {
@@ -14,9 +14,10 @@ interface ProfilePageProps {
 
 export default function ProfilePage({ params }: ProfilePageProps) {
   const [activeTab, setActiveTab] = useState<'videos' | 'likes'>('videos');
+  const [showMenu, setShowMenu] = useState(false);
   const { user: currentUser } = useAuthStore();
 
-  const { data: profile, isLoading: profileLoading, error: profileError } = useQuery(
+  const { data: profile, isLoading: profileLoading, error: profileError, refetch: refetchProfile } = useQuery(
     ['profile', params.id],
     () => profileApi.getProfile(params.id)
   );
@@ -28,6 +29,13 @@ export default function ProfilePage({ params }: ProfilePageProps) {
   );
 
   const followMutation = useMutation(() => profileApi.followUser(params.id));
+
+  const blockMutation = useMutation(() => profileApi.blockUser(params.id), {
+    onSuccess: () => {
+      setShowMenu(false);
+      refetchProfile();
+    },
+  });
 
   if (profileLoading) {
     return (
@@ -50,7 +58,8 @@ export default function ProfilePage({ params }: ProfilePageProps) {
     );
   }
 
-  const { user, statistics, is_following } = profile;
+  const { user, statistics, is_following, is_blocked } = profile;
+  const isBlocked = blockMutation.data?.is_blocked ?? is_blocked;
   const isFollowing = followMutation.data?.is_following ?? is_following;
   const followersCount = followMutation.data?.followers_count ?? statistics.followers_count;
   const videos = videosData?.videos || [];
@@ -92,11 +101,11 @@ export default function ProfilePage({ params }: ProfilePageProps) {
           </div>
 
           {!isOwnProfile && (
-            <div className="flex gap-2">
+            <div className="flex gap-2 relative">
               <button
                 onClick={() => followMutation.mutate()}
-                disabled={followMutation.isLoading}
-                className={`px-6 py-2 rounded-full font-semibold transition ${
+                disabled={followMutation.isLoading || isBlocked}
+                className={`px-6 py-2 rounded-full font-semibold transition disabled:opacity-50 ${
                   isFollowing
                     ? 'bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600'
                     : 'bg-pink-600 text-white hover:bg-pink-700'
@@ -107,7 +116,28 @@ export default function ProfilePage({ params }: ProfilePageProps) {
               <button className="p-2 rounded-full border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800">
                 <MessageCircle className="w-5 h-5" />
               </button>
+              <button
+                onClick={() => setShowMenu((v) => !v)}
+                className="p-2 rounded-full border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800"
+              >
+                <MoreVertical className="w-5 h-5" />
+              </button>
+              {showMenu && (
+                <div className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-10">
+                  <button
+                    onClick={() => blockMutation.mutate()}
+                    disabled={blockMutation.isLoading}
+                    className="w-full flex items-center gap-2 px-4 py-3 text-left text-red-600 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg disabled:opacity-50"
+                  >
+                    <Ban className="w-4 h-4" />
+                    {isBlocked ? 'Unblock' : 'Block'} @{user.username}
+                  </button>
+                </div>
+              )}
             </div>
+          )}
+          {isBlocked && !isOwnProfile && (
+            <p className="text-sm text-red-600 mt-2">You have blocked this user.</p>
           )}
 
           {isOwnProfile && (
@@ -127,14 +157,14 @@ export default function ProfilePage({ params }: ProfilePageProps) {
             <p className="text-2xl font-bold">{statistics.videos_count}</p>
             <p className="text-gray-600 dark:text-gray-400">Videos</p>
           </div>
-          <div>
+          <Link href={`/profile/${params.id}/followers`} className="hover:opacity-70 transition">
             <p className="text-2xl font-bold">{followersCount.toLocaleString()}</p>
             <p className="text-gray-600 dark:text-gray-400">Followers</p>
-          </div>
-          <div>
+          </Link>
+          <Link href={`/profile/${params.id}/following`} className="hover:opacity-70 transition">
             <p className="text-2xl font-bold">{statistics.following_count}</p>
             <p className="text-gray-600 dark:text-gray-400">Following</p>
-          </div>
+          </Link>
         </div>
 
         {/* Tabs */}
