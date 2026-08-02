@@ -5,6 +5,12 @@ import '../../services/ai_service.dart';
 import '../../services/editor_service.dart';
 
 const _effects = ['blur', 'brighten', 'saturate', 'desaturate', 'vintage', 'cinematic'];
+const _voices = [
+  {'id': 'en-US-female-1', 'label': 'English (US) — Female'},
+  {'id': 'en-US-male-1', 'label': 'English (US) — Male'},
+  {'id': 'en-GB-female-1', 'label': 'English (UK) — Female'},
+  {'id': 'es-ES-female-1', 'label': 'Spanish — Female'},
+];
 
 class EditorScreen extends StatefulWidget {
   final String draftId;
@@ -25,6 +31,9 @@ class _EditorScreenState extends State<EditorScreen> {
   String? _exportStatus;
   final Map<String, String> _aiStatus = {};
   final Map<String, List<Map<String, dynamic>>> _stickersBySegment = {};
+  List<SoundRecommendation> _sounds = [];
+  bool _soundsLoading = false;
+  bool _soundsLoaded = false;
 
   @override
   void initState() {
@@ -103,6 +112,69 @@ class _EditorScreenState extends State<EditorScreen> {
       await _load();
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+    }
+  }
+
+  Future<void> _generateVoiceover(EditorSegment segment) async {
+    final textController = TextEditingController();
+    String selectedVoiceId = _voices.first['id']!;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Generate voiceover'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: textController,
+                autofocus: true,
+                maxLines: 3,
+                decoration: const InputDecoration(hintText: 'Voiceover script'),
+              ),
+              const SizedBox(height: 12),
+              DropdownButton<String>(
+                value: selectedVoiceId,
+                isExpanded: true,
+                items: _voices
+                    .map((v) => DropdownMenuItem(value: v['id'], child: Text(v['label']!)))
+                    .toList(),
+                onChanged: (value) => setDialogState(() => selectedVoiceId = value!),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+            TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Generate')),
+          ],
+        ),
+      ),
+    );
+
+    if (confirmed != true || textController.text.isEmpty) return;
+
+    setState(() => _aiStatus[segment.id] = 'Generating voiceover... (15 credits)');
+    try {
+      await _aiService.generateVoiceover(segment.id, textController.text, selectedVoiceId);
+      setState(() => _aiStatus[segment.id] = 'Voiceover queued');
+    } catch (e) {
+      setState(() => _aiStatus[segment.id] = e.toString());
+    }
+  }
+
+  Future<void> _loadSounds([String? category]) async {
+    setState(() => _soundsLoading = true);
+    try {
+      final sounds = await _aiService.getSoundRecommendations(category: category);
+      setState(() {
+        _sounds = sounds;
+        _soundsLoaded = true;
+      });
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+    } finally {
+      setState(() => _soundsLoading = false);
     }
   }
 
@@ -362,6 +434,11 @@ class _EditorScreenState extends State<EditorScreen> {
                                     label: const Text('Smart frame'),
                                     onPressed: () => _smartFrame(segment),
                                   ),
+                                  ActionChip(
+                                    avatar: const Icon(Icons.mic, size: 16),
+                                    label: const Text('Voiceover'),
+                                    onPressed: () => _generateVoiceover(segment),
+                                  ),
                                 ],
                               ),
                               if (_aiStatus[segment.id] != null)
@@ -379,6 +456,52 @@ class _EditorScreenState extends State<EditorScreen> {
                     }),
                     if ((_state?.segments ?? []).isEmpty)
                       const Center(child: Text('No segments yet')),
+                    const Divider(height: 32),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Row(
+                          children: [
+                            Icon(Icons.music_note, size: 18),
+                            SizedBox(width: 6),
+                            Text('Sound recommendations', style: TextStyle(fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                        if (!_soundsLoaded)
+                          TextButton(
+                            onPressed: _soundsLoading ? null : () => _loadSounds(),
+                            child: Text(_soundsLoading ? 'Loading...' : 'Browse sounds'),
+                          ),
+                      ],
+                    ),
+                    if (_soundsLoaded) ...[
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        children: ['background', 'sound_effect', 'music', 'ambient']
+                            .map((cat) => ActionChip(
+                                  label: Text(cat.replaceAll('_', ' ')),
+                                  onPressed: () => _loadSounds(cat),
+                                ))
+                            .toList(),
+                      ),
+                      const SizedBox(height: 8),
+                      if (_sounds.isEmpty)
+                        const Text('No sounds found', style: TextStyle(color: Colors.grey))
+                      else
+                        ..._sounds.map((sound) => ListTile(
+                              dense: true,
+                              contentPadding: EdgeInsets.zero,
+                              title: Text(sound.soundTitle),
+                              subtitle: sound.artist != null ? Text(sound.artist!) : null,
+                              trailing: sound.isTrending
+                                  ? const Text(
+                                      'Trending',
+                                      style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold, fontSize: 12),
+                                    )
+                                  : null,
+                            )),
+                    ],
                   ],
                 ),
     );

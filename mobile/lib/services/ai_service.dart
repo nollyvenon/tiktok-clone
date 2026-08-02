@@ -26,6 +26,32 @@ class AICreditsInfo {
   }
 }
 
+class SoundRecommendation {
+  final String id;
+  final String soundTitle;
+  final String? artist;
+  final String category;
+  final bool isTrending;
+
+  SoundRecommendation({
+    required this.id,
+    required this.soundTitle,
+    this.artist,
+    required this.category,
+    required this.isTrending,
+  });
+
+  factory SoundRecommendation.fromJson(Map<String, dynamic> json) {
+    return SoundRecommendation(
+      id: json['id'] as String,
+      soundTitle: json['sound_title'] as String,
+      artist: json['artist'] as String?,
+      category: json['category'] as String,
+      isTrending: json['is_trending'] as bool? ?? false,
+    );
+  }
+}
+
 class AIService {
   final Dio _dio = ApiClient().dio;
 
@@ -80,6 +106,31 @@ class AIService {
       });
     } on DioException catch (e) {
       throw ApiException(_extractError(e, 'Smart framing failed'));
+    }
+  }
+
+  Future<void> generateVoiceover(String segmentId, String text, String voiceId) async {
+    try {
+      await _dio.post('/api/ai/voiceover', data: {
+        'segment_id': segmentId,
+        'text': text,
+        'voice_id': voiceId,
+      });
+    } on DioException catch (e) {
+      throw ApiException(_extractError(e, 'Voiceover generation failed'));
+    }
+  }
+
+  Future<List<SoundRecommendation>> getSoundRecommendations({String? category}) async {
+    try {
+      final response = await _dio.get('/api/ai/sounds/recommendations', queryParameters: {
+        if (category != null) 'category': category,
+      });
+      return (response.data['sounds'] as List)
+          .map((e) => SoundRecommendation.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } on DioException catch (e) {
+      throw ApiException(_extractError(e, 'Failed to load sound recommendations'));
     }
   }
 
