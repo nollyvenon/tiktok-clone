@@ -298,6 +298,190 @@ async def test_publish_draft(test_client: AsyncClient, register_user_data):
     assert "video_id" in data
 
 
+async def _complete_upload(test_client, access_token, video_url="https://example.com/video.mp4"):
+    response = await test_client.post(
+        "/api/uploads/presigned-url",
+        json={"filename": "video.mp4", "file_size": 104857600, "mime_type": "video/mp4"},
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    upload_id = response.json()["upload_id"]
+    await test_client.post(
+        f"/api/uploads/{upload_id}/complete",
+        params={"processed_video_url": video_url, "thumbnail_url": "https://example.com/thumb.jpg", "duration": 15},
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    return upload_id
+
+
+async def _register(test_client, register_user_data, email, username):
+    data = dict(register_user_data)
+    data["email"] = email
+    data["username"] = username
+    response = await test_client.post("/api/auth/register", json=data)
+    return response.json()["access_token"], response.json()["user"]["id"]
+
+
+@pytest.mark.asyncio
+async def test_publish_draft_as_duet(test_client: AsyncClient, register_user_data):
+    """The real client-facing duet flow: publish a video, then publish a
+    second user's draft as a duet of it, through the actual draft/publish
+    pipeline (not the unused direct POST /videos endpoint)."""
+    creator_token, _ = await _register(test_client, register_user_data, "draftduetorig@example.com", "draftduetoriguser")
+    duetist_token, _ = await _register(test_client, register_user_data, "draftduetist@example.com", "draftduetistuser")
+
+    upload_id = await _complete_upload(test_client, creator_token, "https://example.com/original2.mp4")
+    original_draft = await test_client.post(
+        "/api/uploads/drafts",
+        json={"title": "Original video"},
+        params={"upload_id": upload_id},
+        headers={"Authorization": f"Bearer {creator_token}"},
+    )
+    original_publish = await test_client.post(
+        f"/api/uploads/drafts/{original_draft.json()['id']}/publish",
+        headers={"Authorization": f"Bearer {creator_token}"},
+    )
+    original_video_id = original_publish.json()["video_id"]
+
+    duet_upload_id = await _complete_upload(test_client, duetist_token, "https://example.com/myduet.mp4")
+    duet_draft = await test_client.post(
+        "/api/uploads/drafts",
+        json={
+            "title": "My duet",
+            "original_video_id": original_video_id,
+            "remix_type": "duet",
+        },
+        params={"upload_id": duet_upload_id},
+        headers={"Authorization": f"Bearer {duetist_token}"},
+    )
+    assert duet_draft.json()["original_video_id"] == original_video_id
+    assert duet_draft.json()["remix_type"] == "duet"
+
+    publish_response = await test_client.post(
+        f"/api/uploads/drafts/{duet_draft.json()['id']}/publish",
+        headers={"Authorization": f"Bearer {duetist_token}"},
+    )
+    assert publish_response.status_code == 200
+    duet_video_id = publish_response.json()["video_id"]
+
+    detail = await test_client.get(f"/api/videos/{duet_video_id}")
+    data = detail.json()
+    assert data["remix_type"] == "duet"
+    assert data["original_video"]["id"] == original_video_id
+
+
+@pytest.mark.asyncio
+async def test_publish_draft_duet_rejected_when_disabled(test_client: AsyncClient, register_user_data):
+    creator_token, _ = await _register(test_client, register_user_data, "draftnoduetorig@example.com", "draftnoduetoriguser")
+    duetist_token, _ = await _register(test_client, register_user_data, "draftnoduetist@example.com", "draftnoduetistuser")
+
+    upload_id = await _complete_upload(test_client, creator_token)
+    original_draft = await test_client.post(
+        "/api/uploads/drafts",
+        json={"title": "No duets", "allow_duets": False},
+        params={"upload_id": upload_id},
+        headers={"Authorization": f"Bearer {creator_token}"},
+    )
+    original_publish = await test_client.post(
+        f"/api/uploads/drafts/{original_draft.json()['id']}/publish",
+        headers={"Authorization": f"Bearer {creator_token}"},
+    )
+    original_video_id = original_publish.json()["video_id"]
+
+    duet_upload_id = await _complete_upload(test_client, duetist_token)
+    duet_draft = await test_client.post(
+        "/api/uploads/drafts",
+        json={"title": "Attempted duet", "original_video_id": original_video_id, "remix_type": "duet"},
+        params={"upload_id": duet_upload_id},
+        headers={"Authorization": f"Bearer {duetist_token}"},
+    )
+
+    publish_response = await test_client.post(
+        f"/api/uploads/drafts/{duet_draft.json()['id']}/publish",
+        headers={"Authorization": f"Bearer {duetist_token}"},
+    )
+    assert publish_response.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_publish_draft_duet_revoked_between_draft_and_publish(test_client: AsyncClient, register_user_data):
+    """Duet permission is checked at publish time, not draft-save time -
+    disabling duets after the draft was created must still block publish."""
+    creator_token, _ = await _register(test_client, register_user_data, "revokeorig@example.com", "revokeoriguser")
+    duetist_token, _ = await _register(test_client, register_user_data, "revokeduetist@example.com", "revokeduetistuser")
+
+    upload_id = await _complete_upload(test_client, creator_token)
+    original_draft = await test_client.post(
+        "/api/uploads/drafts",
+        json={"title": "Originally allowed"},
+        params={"upload_id": upload_id},
+        headers={"Authorization": f"Bearer {creator_token}"},
+    )
+    original_publish = await test_client.post(
+        f"/api/uploads/drafts/{original_draft.json()['id']}/publish",
+        headers={"Authorization": f"Bearer {creator_token}"},
+    )
+    original_video_id = original_publish.json()["video_id"]
+
+    duet_upload_id = await _complete_upload(test_client, duetist_token)
+    duet_draft = await test_client.post(
+        "/api/uploads/drafts",
+        json={"title": "Duet in progress", "original_video_id": original_video_id, "remix_type": "duet"},
+        params={"upload_id": duet_upload_id},
+        headers={"Authorization": f"Bearer {duetist_token}"},
+    )
+
+    # Creator disables duets after the draft already references their video
+    await test_client.put(
+        f"/api/videos/{original_video_id}",
+        json={"allow_duets": False},
+        headers={"Authorization": f"Bearer {creator_token}"},
+    )
+
+    publish_response = await test_client.post(
+        f"/api/uploads/drafts/{duet_draft.json()['id']}/publish",
+        headers={"Authorization": f"Bearer {duetist_token}"},
+    )
+    assert publish_response.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_publish_duet_triggers_notification(test_client: AsyncClient, register_user_data):
+    creator_token, _ = await _register(test_client, register_user_data, "notifydraftorig@example.com", "notifydraftoriguser")
+    duetist_token, _ = await _register(test_client, register_user_data, "notifydraftist@example.com", "notifydraftistuser")
+
+    upload_id = await _complete_upload(test_client, creator_token)
+    original_draft = await test_client.post(
+        "/api/uploads/drafts",
+        json={"title": "Original"},
+        params={"upload_id": upload_id},
+        headers={"Authorization": f"Bearer {creator_token}"},
+    )
+    original_publish = await test_client.post(
+        f"/api/uploads/drafts/{original_draft.json()['id']}/publish",
+        headers={"Authorization": f"Bearer {creator_token}"},
+    )
+    original_video_id = original_publish.json()["video_id"]
+
+    duet_upload_id = await _complete_upload(test_client, duetist_token)
+    duet_draft = await test_client.post(
+        "/api/uploads/drafts",
+        json={"title": "Notify duet", "original_video_id": original_video_id, "remix_type": "duet"},
+        params={"upload_id": duet_upload_id},
+        headers={"Authorization": f"Bearer {duetist_token}"},
+    )
+    await test_client.post(
+        f"/api/uploads/drafts/{duet_draft.json()['id']}/publish",
+        headers={"Authorization": f"Bearer {duetist_token}"},
+    )
+
+    notif_response = await test_client.get(
+        "/api/notifications", headers={"Authorization": f"Bearer {creator_token}"}
+    )
+    data = notif_response.json()
+    assert data["total"] == 1
+    assert data["notifications"][0]["type"] == "duet_stitch"
+
+
 @pytest.mark.asyncio
 async def test_schedule_draft(test_client: AsyncClient, register_user_data):
     """Test scheduling a draft"""

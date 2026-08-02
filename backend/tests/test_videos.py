@@ -572,5 +572,277 @@ async def test_get_user_videos(test_client: AsyncClient, register_user_data):
     assert len(feed["videos"]) == 2
 
 
+@pytest.mark.asyncio
+async def test_create_duet(test_client: AsyncClient, register_user_data):
+    creator_token, _ = await _register_and_login(
+        test_client, register_user_data, "duetorig@example.com", "duetoriguser"
+    )
+    duetist_token, _ = await _register_and_login(
+        test_client, register_user_data, "duetist@example.com", "duetistuser"
+    )
+
+    original = await test_client.post(
+        "/api/videos",
+        json={"title": "Original", "video_url": "https://example.com/original.mp4"},
+        headers={"Authorization": f"Bearer {creator_token}"},
+    )
+    original_id = original.json()["id"]
+
+    duet = await test_client.post(
+        "/api/videos",
+        json={
+            "title": "My duet",
+            "video_url": "https://example.com/duet.mp4",
+            "original_video_id": original_id,
+            "remix_type": "duet",
+        },
+        headers={"Authorization": f"Bearer {duetist_token}"},
+    )
+    assert duet.status_code == 201
+
+    detail = await test_client.get(f"/api/videos/{duet.json()['id']}")
+    data = detail.json()
+    assert data["remix_type"] == "duet"
+    assert data["original_video"]["id"] == original_id
+    assert data["original_video"]["user"]["username"] == "duetoriguser"
+
+
+@pytest.mark.asyncio
+async def test_create_stitch(test_client: AsyncClient, register_user_data):
+    creator_token, _ = await _register_and_login(
+        test_client, register_user_data, "stitchorig@example.com", "stitchoriguser"
+    )
+    stitcher_token, _ = await _register_and_login(
+        test_client, register_user_data, "stitcher@example.com", "stitcheruser"
+    )
+
+    original = await test_client.post(
+        "/api/videos",
+        json={"title": "Original", "video_url": "https://example.com/original2.mp4"},
+        headers={"Authorization": f"Bearer {creator_token}"},
+    )
+    original_id = original.json()["id"]
+
+    stitch = await test_client.post(
+        "/api/videos",
+        json={
+            "title": "My stitch",
+            "video_url": "https://example.com/stitch.mp4",
+            "original_video_id": original_id,
+            "remix_type": "stitch",
+        },
+        headers={"Authorization": f"Bearer {stitcher_token}"},
+    )
+    assert stitch.status_code == 201
+    assert stitch.json()["id"] != original_id
+
+
+@pytest.mark.asyncio
+async def test_duet_disabled_rejected(test_client: AsyncClient, register_user_data):
+    creator_token, _ = await _register_and_login(
+        test_client, register_user_data, "nodueorig@example.com", "noduteoriguser"
+    )
+    duetist_token, _ = await _register_and_login(
+        test_client, register_user_data, "noduet@example.com", "noduetuser"
+    )
+
+    original = await test_client.post(
+        "/api/videos",
+        json={
+            "title": "No duets allowed",
+            "video_url": "https://example.com/noduet.mp4",
+            "allow_duets": False,
+        },
+        headers={"Authorization": f"Bearer {creator_token}"},
+    )
+    original_id = original.json()["id"]
+
+    response = await test_client.post(
+        "/api/videos",
+        json={
+            "title": "Attempted duet",
+            "video_url": "https://example.com/attempted.mp4",
+            "original_video_id": original_id,
+            "remix_type": "duet",
+        },
+        headers={"Authorization": f"Bearer {duetist_token}"},
+    )
+    assert response.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_stitch_disabled_rejected(test_client: AsyncClient, register_user_data):
+    creator_token, _ = await _register_and_login(
+        test_client, register_user_data, "nostitchorig@example.com", "nostitchoriguser"
+    )
+    stitcher_token, _ = await _register_and_login(
+        test_client, register_user_data, "nostitch@example.com", "nostitchuser"
+    )
+
+    original = await test_client.post(
+        "/api/videos",
+        json={
+            "title": "No stitches allowed",
+            "video_url": "https://example.com/nostitch.mp4",
+            "allow_stitches": False,
+        },
+        headers={"Authorization": f"Bearer {creator_token}"},
+    )
+    original_id = original.json()["id"]
+
+    response = await test_client.post(
+        "/api/videos",
+        json={
+            "title": "Attempted stitch",
+            "video_url": "https://example.com/attemptedstitch.mp4",
+            "original_video_id": original_id,
+            "remix_type": "stitch",
+        },
+        headers={"Authorization": f"Bearer {stitcher_token}"},
+    )
+    assert response.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_remix_type_required_with_original_video_id(test_client: AsyncClient, register_user_data):
+    token, _ = await _register_and_login(
+        test_client, register_user_data, "mismatch@example.com", "mismatchuser"
+    )
+    original = await test_client.post(
+        "/api/videos",
+        json={"title": "Original", "video_url": "https://example.com/mismatchorig.mp4"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    response = await test_client.post(
+        "/api/videos",
+        json={
+            "title": "Missing remix_type",
+            "video_url": "https://example.com/missing.mp4",
+            "original_video_id": original.json()["id"],
+        },
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_blocked_user_cannot_duet(test_client: AsyncClient, register_user_data):
+    creator_token, creator_id = await _register_and_login(
+        test_client, register_user_data, "blockduetorig@example.com", "blockduetoriguser"
+    )
+    duetist_token, duetist_id = await _register_and_login(
+        test_client, register_user_data, "blockduetist@example.com", "blockduetistuser"
+    )
+
+    original = await test_client.post(
+        "/api/videos",
+        json={"title": "Original", "video_url": "https://example.com/blockorig.mp4"},
+        headers={"Authorization": f"Bearer {creator_token}"},
+    )
+    original_id = original.json()["id"]
+
+    await test_client.post(
+        f"/api/profiles/{duetist_id}/block", headers={"Authorization": f"Bearer {creator_token}"}
+    )
+
+    response = await test_client.post(
+        "/api/videos",
+        json={
+            "title": "Blocked duet attempt",
+            "video_url": "https://example.com/blockedduet.mp4",
+            "original_video_id": original_id,
+            "remix_type": "duet",
+        },
+        headers={"Authorization": f"Bearer {duetist_token}"},
+    )
+    assert response.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_get_remixes_of_a_video(test_client: AsyncClient, register_user_data):
+    creator_token, _ = await _register_and_login(
+        test_client, register_user_data, "remixlistorig@example.com", "remixlistoriguser"
+    )
+    duetist_token, _ = await _register_and_login(
+        test_client, register_user_data, "remixlistduet@example.com", "remixlistduetuser"
+    )
+    stitcher_token, _ = await _register_and_login(
+        test_client, register_user_data, "remixliststitch@example.com", "remixliststitchuser"
+    )
+
+    original = await test_client.post(
+        "/api/videos",
+        json={"title": "Popular original", "video_url": "https://example.com/popular.mp4"},
+        headers={"Authorization": f"Bearer {creator_token}"},
+    )
+    original_id = original.json()["id"]
+
+    await test_client.post(
+        "/api/videos",
+        json={
+            "title": "A duet",
+            "video_url": "https://example.com/aduet.mp4",
+            "original_video_id": original_id,
+            "remix_type": "duet",
+        },
+        headers={"Authorization": f"Bearer {duetist_token}"},
+    )
+    await test_client.post(
+        "/api/videos",
+        json={
+            "title": "A stitch",
+            "video_url": "https://example.com/astitch.mp4",
+            "original_video_id": original_id,
+            "remix_type": "stitch",
+        },
+        headers={"Authorization": f"Bearer {stitcher_token}"},
+    )
+
+    all_remixes = await test_client.get(f"/api/videos/{original_id}/remixes")
+    assert all_remixes.json()["total"] == 2
+
+    duets_only = await test_client.get(
+        f"/api/videos/{original_id}/remixes", params={"remix_type": "duet"}
+    )
+    assert duets_only.json()["total"] == 1
+    assert duets_only.json()["videos"][0]["title"] == "A duet"
+
+
+@pytest.mark.asyncio
+async def test_duet_triggers_notification(test_client: AsyncClient, register_user_data):
+    creator_token, _ = await _register_and_login(
+        test_client, register_user_data, "notifyduetorig@example.com", "notifyduetoriguser"
+    )
+    duetist_token, _ = await _register_and_login(
+        test_client, register_user_data, "notifyduetist@example.com", "notifyduetistuser"
+    )
+
+    original = await test_client.post(
+        "/api/videos",
+        json={"title": "Original", "video_url": "https://example.com/notifyorig.mp4"},
+        headers={"Authorization": f"Bearer {creator_token}"},
+    )
+    original_id = original.json()["id"]
+
+    await test_client.post(
+        "/api/videos",
+        json={
+            "title": "Notify duet",
+            "video_url": "https://example.com/notifyduet.mp4",
+            "original_video_id": original_id,
+            "remix_type": "duet",
+        },
+        headers={"Authorization": f"Bearer {duetist_token}"},
+    )
+
+    notif_response = await test_client.get(
+        "/api/notifications", headers={"Authorization": f"Bearer {creator_token}"}
+    )
+    data = notif_response.json()
+    assert data["total"] == 1
+    assert data["notifications"][0]["type"] == "duet_stitch"
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "-s"])

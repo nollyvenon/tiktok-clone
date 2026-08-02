@@ -10,8 +10,9 @@ from uuid import UUID
 import logging
 import random
 
-from app.models import Video, Like, Bookmark, View, User, Follow, VideoStatus
+from app.models import Video, Like, Bookmark, View, User, Follow, VideoStatus, RemixType
 from app.schemas import VideoCreate, VideoUpdate, VideoAnalytics
+from app.services.profiles import ProfileService
 
 logger = logging.getLogger(__name__)
 
@@ -20,13 +21,51 @@ class VideoService:
     """Service for video operations"""
 
     @staticmethod
+    async def validate_remix(
+        db: AsyncSession,
+        user_id: UUID,
+        original_video_id: Optional[UUID],
+        remix_type: Optional[RemixType],
+    ) -> None:
+        """
+        Shared validation for creating a video as a duet/stitch of another,
+        used by both the direct video-create path and the draft-publish
+        path (the one real clients actually use).
+
+        Raises:
+            ValueError: If original_video_id/remix_type are set but
+                inconsistent, the original doesn't exist, doesn't allow
+                that remix type, or either party has blocked the other.
+        """
+        if bool(original_video_id) != bool(remix_type):
+            raise ValueError("original_video_id and remix_type must be provided together")
+
+        if original_video_id is None:
+            return
+
+        original = await db.get(Video, original_video_id)
+        if not original or original.deleted_at is not None or original.status != VideoStatus.PUBLISHED:
+            raise ValueError("Original video not found")
+
+        if remix_type == RemixType.DUET and not original.allow_duets:
+            raise ValueError("Duets are disabled for this video")
+        if remix_type == RemixType.STITCH and not original.allow_stitches:
+            raise ValueError("Stitches are disabled for this video")
+
+        if original.user_id != user_id and (
+            await ProfileService.is_blocked(db, original.user_id, user_id)
+            or await ProfileService.is_blocked(db, user_id, original.user_id)
+        ):
+            raise ValueError("Cannot remix this video")
+
+    @staticmethod
     async def create_video(
         db: AsyncSession,
         user_id: UUID,
         video_data: VideoCreate,
     ) -> Video:
         """
-        Create a new video
+        Create a new video, optionally as a duet/stitch of an existing one.
 
         Args:
             db: Database session
@@ -35,7 +74,14 @@ class VideoService:
 
         Returns:
             Created video object
+
+        Raises:
+            ValueError: See validate_remix.
         """
+        await VideoService.validate_remix(
+            db, user_id, video_data.original_video_id, video_data.remix_type
+        )
+
         video = Video(
             user_id=user_id,
             title=video_data.title,
@@ -50,6 +96,8 @@ class VideoService:
             allow_comments=video_data.allow_comments,
             allow_duets=video_data.allow_duets,
             allow_stitches=video_data.allow_stitches,
+            original_video_id=video_data.original_video_id,
+            remix_type=video_data.remix_type,
             status=VideoStatus.PUBLISHED,
             published_at=datetime.utcnow(),
         )
@@ -436,6 +484,35 @@ class VideoService:
         videos = [videos_by_id[vid] for vid in video_ids if vid in videos_by_id]
 
         return videos, total
+
+    @staticmethod
+    async def get_remixes(
+        db: AsyncSession,
+        original_video_id: UUID,
+        remix_type: Optional[RemixType] = None,
+        limit: int = 20,
+        offset: int = 0,
+    ) -> Tuple[List[Video], int]:
+        """
+        Get duets/stitches made from a video, newest first. Pass
+        remix_type to filter to just duets or just stitches; omit it to
+        get both.
+        """
+        filters = [
+            Video.original_video_id == original_video_id,
+            Video.status == VideoStatus.PUBLISHED,
+            Video.is_public == True,
+        ]
+        if remix_type is not None:
+            filters.append(Video.remix_type == remix_type)
+
+        count_result = await db.execute(select(func.count()).select_from(Video).where(and_(*filters)))
+        total = count_result.scalar() or 0
+
+        result = await db.execute(
+            select(Video).where(and_(*filters)).order_by(desc(Video.created_at)).offset(offset).limit(limit)
+        )
+        return list(result.scalars().all()), total
 
     @staticmethod
     async def track_view(

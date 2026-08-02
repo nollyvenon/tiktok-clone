@@ -7,7 +7,7 @@ from typing import Optional, List
 from datetime import datetime
 from uuid import UUID
 
-from app.models import UserRole
+from app.models import UserRole, RemixType
 
 
 # ============================================================================
@@ -339,6 +339,10 @@ class VideoCreate(BaseModel):
     allow_comments: bool = True
     allow_duets: bool = True
     allow_stitches: bool = True
+    # Duets & Stitches: set both to create this video as a remix of an
+    # existing one. Leave both unset for a normal (non-remix) upload.
+    original_video_id: Optional[UUID] = None
+    remix_type: Optional[RemixType] = None
 
 
 class VideoUpdate(BaseModel):
@@ -378,6 +382,17 @@ class VideoResponse(BaseModel):
         from_attributes = True
 
 
+class OriginalVideoPreview(BaseModel):
+    """Minimal preview of the video a duet/stitch was made from"""
+    id: UUID
+    title: Optional[str] = None
+    thumbnail_url: Optional[str] = None
+    user: UserPublicProfile
+
+    class Config:
+        from_attributes = True
+
+
 class VideoDetailResponse(VideoResponse):
     """Detailed video response with user info"""
     user: UserPublicProfile
@@ -386,6 +401,8 @@ class VideoDetailResponse(VideoResponse):
     allow_comments: bool
     allow_duets: bool
     allow_stitches: bool
+    remix_type: Optional[RemixType] = None
+    original_video: Optional[OriginalVideoPreview] = None
 
     class Config:
         from_attributes = True
@@ -466,6 +483,11 @@ class DraftCreate(BaseModel):
     allow_duets: bool = True
     allow_stitches: bool = True
     scheduled_publish_at: Optional[datetime] = None
+    # Duets & Stitches: set both to publish this draft as a remix of an
+    # existing video (validated at publish time, not draft save time, so
+    # the original creator can still revoke permission in between).
+    original_video_id: Optional[UUID] = None
+    remix_type: Optional[RemixType] = None
 
 
 class DraftResponse(BaseModel):
@@ -480,6 +502,8 @@ class DraftResponse(BaseModel):
     allow_comments: bool
     allow_duets: bool
     allow_stitches: bool
+    original_video_id: Optional[UUID] = None
+    remix_type: Optional[RemixType] = None
     status: str
     scheduled_publish_at: Optional[datetime] = None
     created_at: datetime

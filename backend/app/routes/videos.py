@@ -12,17 +12,33 @@ from app.database import get_db
 from app.schemas import (
     VideoCreate, VideoUpdate, VideoResponse, VideoDetailResponse,
     FeedResponse, LikeResponse, BookmarkResponse, ViewTrackingRequest,
-    VideoAnalytics, ErrorResponse, UserPublicProfile
+    VideoAnalytics, ErrorResponse, UserPublicProfile, OriginalVideoPreview
 )
 from app.services.videos import VideoService
 from app.services.profiles import ProfileService
 from app.services.notifications import NotificationService
 from app.routes.auth import get_current_user, get_optional_current_user
-from app.models import User, NotificationType
+from app.models import User, NotificationType, Video, RemixType
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/videos", tags=["Videos"])
+
+
+async def _build_original_video_preview(db: AsyncSession, video: Video) -> Optional[OriginalVideoPreview]:
+    """Builds the duet/stitch attribution preview for a remix video, if any"""
+    if video.original_video_id is None:
+        return None
+    original = await db.get(Video, video.original_video_id)
+    if not original:
+        return None
+    original_user = await ProfileService.get_user_profile(db, original.user_id)
+    return OriginalVideoPreview(
+        id=original.id,
+        title=original.title,
+        thumbnail_url=original.thumbnail_url,
+        user=UserPublicProfile.from_orm(original_user),
+    )
 
 
 # ============================================================================
@@ -95,6 +111,8 @@ async def get_feed(
                     allow_comments=video.allow_comments,
                     allow_duets=video.allow_duets,
                     allow_stitches=video.allow_stitches,
+                    remix_type=video.remix_type,
+                    original_video=await _build_original_video_preview(db, video),
                 )
             )
 
@@ -177,6 +195,8 @@ async def get_trending(
                     allow_comments=video.allow_comments,
                     allow_duets=video.allow_duets,
                     allow_stitches=video.allow_stitches,
+                    remix_type=video.remix_type,
+                    original_video=await _build_original_video_preview(db, video),
                 )
             )
 
@@ -249,6 +269,8 @@ async def search_videos(
                     allow_comments=video.allow_comments,
                     allow_duets=video.allow_duets,
                     allow_stitches=video.allow_stitches,
+                    remix_type=video.remix_type,
+                    original_video=await _build_original_video_preview(db, video),
                 )
             )
 
@@ -315,6 +337,8 @@ async def get_bookmarked_videos(
                     allow_comments=video.allow_comments,
                     allow_duets=video.allow_duets,
                     allow_stitches=video.allow_stitches,
+                    remix_type=video.remix_type,
+                    original_video=await _build_original_video_preview(db, video),
                 )
             )
 
@@ -389,6 +413,8 @@ async def get_video(
             allow_comments=video.allow_comments,
             allow_duets=video.allow_duets,
             allow_stitches=video.allow_stitches,
+            remix_type=video.remix_type,
+            original_video=await _build_original_video_preview(db, video),
         )
     except HTTPException:
         raise
@@ -462,6 +488,8 @@ async def get_user_videos(
                     allow_comments=video.allow_comments,
                     allow_duets=video.allow_duets,
                     allow_stitches=video.allow_stitches,
+                    remix_type=video.remix_type,
+                    original_video=await _build_original_video_preview(db, video),
                 )
             )
 
@@ -510,13 +538,28 @@ async def create_video(
     """
     try:
         video = await VideoService.create_video(db, current_user.id, request)
-        return VideoResponse.from_orm(video)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
         logger.error(f"Create video error: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to create video",
         )
+
+    if video.original_video_id is not None:
+        original = await db.get(Video, video.original_video_id)
+        if original:
+            await NotificationService.send_notification(
+                db,
+                user_id=original.user_id,
+                notification_type=NotificationType.DUET_STITCH,
+                title=f"{current_user.username} made a {video.remix_type.value} with your video",
+                actor_id=current_user.id,
+                related_video_id=video.id,
+            )
+
+    return VideoResponse.from_orm(video)
 
 
 @router.put(
@@ -718,6 +761,83 @@ async def track_view(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to track view",
+        )
+
+
+@router.get(
+    "/{video_id}/remixes",
+    response_model=FeedResponse,
+    responses={200: {"description": "Duets/stitches made from this video"}},
+)
+async def get_remixes(
+    video_id: UUID,
+    remix_type: Optional[str] = Query(None, description="'duet' or 'stitch' - omit for both"),
+    limit: int = Query(20, ge=1, le=50),
+    offset: int = Query(0, ge=0),
+    current_user: Optional[User] = Depends(get_optional_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get duets and/or stitches made from this video, newest first"""
+    parsed_type = None
+    if remix_type is not None:
+        try:
+            parsed_type = RemixType(remix_type)
+        except ValueError:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="remix_type must be 'duet' or 'stitch'")
+
+    try:
+        videos, total = await VideoService.get_remixes(
+            db, video_id, remix_type=parsed_type, limit=limit, offset=offset
+        )
+
+        video_responses = []
+        for video in videos:
+            user = await ProfileService.get_user_profile(db, video.user_id)
+            is_liked = False
+            is_bookmarked = False
+            if current_user:
+                is_liked = await VideoService.is_liked(db, current_user.id, video.id)
+                is_bookmarked = await VideoService.is_bookmarked(db, current_user.id, video.id)
+
+            video_responses.append(
+                VideoDetailResponse(
+                    id=video.id,
+                    user_id=video.user_id,
+                    user=UserPublicProfile.from_orm(user),
+                    title=video.title,
+                    description=video.description,
+                    video_url=video.video_url,
+                    thumbnail_url=video.thumbnail_url,
+                    duration=video.duration,
+                    hashtags=video.hashtags,
+                    location=video.location,
+                    is_public=video.is_public,
+                    views_count=video.views_count,
+                    likes_count=video.likes_count,
+                    comments_count=video.comments_count,
+                    shares_count=video.shares_count,
+                    bookmarks_count=video.bookmarks_count,
+                    completion_rate=video.completion_rate,
+                    created_at=video.created_at,
+                    published_at=video.published_at,
+                    is_liked=is_liked,
+                    is_bookmarked=is_bookmarked,
+                    allow_comments=video.allow_comments,
+                    allow_duets=video.allow_duets,
+                    allow_stitches=video.allow_stitches,
+                    remix_type=video.remix_type,
+                    original_video=await _build_original_video_preview(db, video),
+                )
+            )
+
+        return FeedResponse(videos=video_responses, total=total)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Get remixes error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve remixes",
         )
 
 

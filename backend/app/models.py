@@ -251,6 +251,12 @@ class VideoStatus(str, enum.Enum):
     DELETED = "deleted"
 
 
+class RemixType(str, enum.Enum):
+    """How a video relates to the original it references, if any"""
+    DUET = "duet"
+    STITCH = "stitch"
+
+
 class Video(Base):
     """User videos"""
     __tablename__ = "videos"
@@ -269,6 +275,11 @@ class Video(Base):
     hashtags = Column(String(500), nullable=True)  # Comma-separated
     music_id = Column(UUID(as_uuid=True), nullable=True)  # Reference to music/sound
     location = Column(String(255), nullable=True)
+
+    # Duets & Stitches: this video is a remix of original_video_id, of the
+    # given type. Both null for an original (non-remix) upload.
+    original_video_id = Column(UUID(as_uuid=True), ForeignKey("videos.id", ondelete="SET NULL"), nullable=True, index=True)
+    remix_type = Column(Enum(RemixType), nullable=True)
 
     # Status & Visibility
     status = Column(Enum(VideoStatus), default=VideoStatus.DRAFT, nullable=False, index=True)
@@ -431,6 +442,12 @@ class Draft(Base):
     allow_comments = Column(Boolean, default=True, nullable=False)
     allow_duets = Column(Boolean, default=True, nullable=False)
     allow_stitches = Column(Boolean, default=True, nullable=False)
+
+    # Duets & Stitches: set both to publish this draft as a remix of an
+    # existing video. Validated at publish time (RemixType is defined on
+    # Video, reused here rather than duplicated).
+    original_video_id = Column(UUID(as_uuid=True), ForeignKey("videos.id", ondelete="SET NULL"), nullable=True)
+    remix_type = Column(Enum(RemixType), nullable=True)
 
     # Status
     status = Column(Enum(DraftStatus), default=DraftStatus.EDITING, nullable=False, index=True)

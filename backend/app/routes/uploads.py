@@ -14,8 +14,9 @@ from app.schemas import (
     UploadPresignedURLRequest, UploadPresignedURLResponse, ErrorResponse
 )
 from app.services.uploads import UploadService
+from app.services.notifications import NotificationService
 from app.routes.auth import get_current_user
-from app.models import User
+from app.models import User, NotificationType, Video
 
 logger = logging.getLogger(__name__)
 
@@ -394,6 +395,18 @@ async def publish_draft(
             draft_id,
             current_user.id,
         )
+
+        if video.original_video_id is not None:
+            original = await db.get(Video, video.original_video_id)
+            if original:
+                await NotificationService.send_notification(
+                    db,
+                    user_id=original.user_id,
+                    notification_type=NotificationType.DUET_STITCH,
+                    title=f"{current_user.username} made a {video.remix_type.value} with your video",
+                    actor_id=current_user.id,
+                    related_video_id=video.id,
+                )
 
         return {
             "message": "Draft published successfully",

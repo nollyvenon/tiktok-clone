@@ -175,6 +175,8 @@ class UploadService:
             draft.allow_duets = draft_data.allow_duets
             draft.allow_stitches = draft_data.allow_stitches
             draft.scheduled_publish_at = draft_data.scheduled_publish_at
+            draft.original_video_id = draft_data.original_video_id
+            draft.remix_type = draft_data.remix_type
 
         db.add(draft)
         await db.commit()
@@ -229,6 +231,8 @@ class UploadService:
         draft.allow_duets = draft_data.allow_duets
         draft.allow_stitches = draft_data.allow_stitches
         draft.scheduled_publish_at = draft_data.scheduled_publish_at
+        draft.original_video_id = draft_data.original_video_id
+        draft.remix_type = draft_data.remix_type
 
         await db.commit()
         await db.refresh(draft)
@@ -309,7 +313,9 @@ class UploadService:
             Published video
 
         Raises:
-            ValueError: If draft invalid or user not authorized
+            ValueError: If draft invalid, user not authorized, or (when
+                the draft is a duet/stitch) the original video no longer
+                allows that remix type - see VideoService.validate_remix.
         """
         draft = await UploadService.get_draft(db, draft_id)
         if not draft:
@@ -326,6 +332,11 @@ class UploadService:
         if not upload or upload.status != UploadStatus.COMPLETED:
             raise ValueError("Upload not ready for publishing")
 
+        # Re-validate remix permissions at publish time, not draft-save
+        # time - the original creator may have disabled duets/stitches or
+        # blocked this user in between.
+        await VideoService.validate_remix(db, user_id, draft.original_video_id, draft.remix_type)
+
         # Create video from draft
         video = Video(
             user_id=user_id,
@@ -339,6 +350,8 @@ class UploadService:
             allow_comments=draft.allow_comments,
             allow_duets=draft.allow_duets,
             allow_stitches=draft.allow_stitches,
+            original_video_id=draft.original_video_id,
+            remix_type=draft.remix_type,
             status=VideoStatus.PUBLISHED,
             published_at=datetime.utcnow(),
         )
