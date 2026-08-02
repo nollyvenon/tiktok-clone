@@ -1403,6 +1403,68 @@ class ModerationDecisionResponse(BaseModel):
 
 
 # ============================================================================
+# Admin Dashboard Schemas
+# ============================================================================
+
+class AdminStatsResponse(BaseModel):
+    """Platform-wide overview stats for the admin dashboard"""
+    total_users: int
+    active_users: int
+    suspended_users: int
+    total_videos: int
+    total_comments: int
+    pending_reports: int
+    actioned_reports: int
+    dismissed_reports: int
+
+
+class AdminUserSummary(BaseModel):
+    """A user row in the admin user-management list"""
+    id: UUID
+    email: str
+    username: str
+    avatar_url: Optional[str] = None
+    is_active: bool
+    is_verified: bool
+    is_creator: bool
+    role: UserRole
+    created_at: datetime
+    last_login: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class AdminUserListResponse(BaseModel):
+    """Paginated admin user list"""
+    users: List[AdminUserSummary]
+    total: int
+    limit: int
+    offset: int
+
+
+class AdminAuditLogEntry(BaseModel):
+    """One moderation decision, enriched with report context for the audit log"""
+    id: UUID
+    report_id: UUID
+    moderator_id: UUID
+    moderator_username: str
+    action: ModerationActionType
+    notes: Optional[str] = None
+    report_content_type: ReportedContentType
+    report_reason: ReportReason
+    created_at: datetime
+
+
+class AdminAuditLogResponse(BaseModel):
+    """Paginated audit log of moderation decisions"""
+    entries: List[AdminAuditLogEntry]
+    total: int
+    limit: int
+    offset: int
+
+
+# ============================================================================
 # Error Schemas
 # ============================================================================
 
