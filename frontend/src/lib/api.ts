@@ -615,7 +615,37 @@ export const videoApi = {
     });
     return res.data;
   },
+
+  getDashboard: async (topVideosLimit = 5) => {
+    const res = await client.get<CreatorDashboard>('/api/videos/dashboard', {
+      params: { top_videos_limit: topVideosLimit },
+    });
+    return res.data;
+  },
 };
+
+export interface TopVideoSummary {
+  video_id: string;
+  title: string | null;
+  thumbnail_url: string | null;
+  views: number;
+  likes: number;
+  comments: number;
+  engagement_rate: number;
+  published_at: string | null;
+}
+
+export interface CreatorDashboard {
+  video_count: number;
+  total_views: number;
+  total_likes: number;
+  total_comments: number;
+  total_shares: number;
+  total_bookmarks: number;
+  average_engagement_rate: number;
+  followers_count: number;
+  top_videos: TopVideoSummary[];
+}
 
 // Comment endpoints
 export interface CommentListResult {
