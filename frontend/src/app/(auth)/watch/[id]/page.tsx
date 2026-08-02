@@ -3,10 +3,11 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation } from 'react-query';
 import { videoApi, profileApi } from '@/lib/api';
-import { Loader2, AlertCircle, Heart, Share2, Bookmark, Repeat2, Scissors, Music } from 'lucide-react';
+import { Loader2, AlertCircle, Heart, Share2, Bookmark, Repeat2, Scissors, Music, Flag } from 'lucide-react';
 import Link from 'next/link';
 import CommentSection from '@/components/features/CommentSection';
 import { VideoCard } from '@/components/features/VideoCard';
+import ReportModal from '@/components/features/ReportModal';
 
 interface WatchPageProps {
   params: { id: string };
@@ -17,6 +18,7 @@ export default function WatchPage({ params }: WatchPageProps) {
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
   const [isFollowing, setIsFollowing] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
 
   const { data: video, isLoading: videoLoading, error: videoError } = useQuery(
     ['video', params.id],
@@ -208,7 +210,22 @@ export default function WatchPage({ params }: WatchPageProps) {
                   <span>Stitch</span>
                 </Link>
               )}
+              <button
+                onClick={() => setShowReportModal(true)}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition text-gray-500 ml-auto"
+              >
+                <Flag className="w-5 h-5" />
+                <span>Report</span>
+              </button>
             </div>
+
+            {showReportModal && (
+              <ReportModal
+                contentType="video"
+                contentId={video.id}
+                onClose={() => setShowReportModal(false)}
+              />
+            )}
 
             {remixesData && remixesData.videos.length > 0 && (
               <div className="mb-8">

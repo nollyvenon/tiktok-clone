@@ -1042,4 +1042,66 @@ export interface HashtagAnalytics {
   total_engagement: number;
 }
 
+export type ReportedContentType = 'video' | 'comment' | 'user';
+export type ReportReason =
+  | 'spam'
+  | 'harassment'
+  | 'nudity'
+  | 'violence'
+  | 'hate_speech'
+  | 'misinformation'
+  | 'self_harm'
+  | 'other';
+export type ReportStatus = 'pending' | 'actioned' | 'dismissed';
+export type ModerationActionType = 'dismiss' | 'remove_content' | 'warn_user' | 'suspend_user' | 'ban_user';
+
+export interface ContentReport {
+  id: string;
+  reporter_id: string;
+  content_type: ReportedContentType;
+  reported_video_id: string | null;
+  reported_comment_id: string | null;
+  reported_user_id: string | null;
+  reason: ReportReason;
+  description: string | null;
+  status: ReportStatus;
+  created_at: string;
+}
+
+export interface ContentReportListResult {
+  reports: ContentReport[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export const moderationApi = {
+  createReport: async (data: {
+    content_type: ReportedContentType;
+    content_id: string;
+    reason: ReportReason;
+    description?: string;
+  }) => {
+    const res = await client.post<ContentReport>('/api/moderation/reports', data);
+    return res.data;
+  },
+
+  getMyReports: async (limit = 20, offset = 0) => {
+    const res = await client.get<ContentReportListResult>('/api/moderation/reports/me', {
+      params: { limit, offset },
+    });
+    return res.data;
+  },
+
+  getReportQueue: async (params?: { status?: ReportStatus; content_type?: ReportedContentType; limit?: number; offset?: number }) => {
+    const res = await client.get<ContentReportListResult>('/api/moderation/reports', { params });
+    return res.data;
+  },
+
+  decideReport: async (reportId: string, action: ModerationActionType, notes?: string) => {
+    const res = await client.post(`/api/moderation/reports/${reportId}/decide`, { action, notes });
+    return res.data;
+  },
+};
+
 export default client;

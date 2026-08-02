@@ -6,8 +6,9 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { profileApi, videoApi, messageApi } from '@/lib/api';
 import { VideoCard } from '@/components/features/VideoCard';
-import { Loader2, AlertCircle, MessageCircle, SlidersHorizontal, MoreVertical, Ban } from 'lucide-react';
+import { Loader2, AlertCircle, MessageCircle, SlidersHorizontal, MoreVertical, Ban, Flag } from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
+import ReportModal from '@/components/features/ReportModal';
 
 interface ProfilePageProps {
   params: { id: string };
@@ -17,6 +18,7 @@ export default function ProfilePage({ params }: ProfilePageProps) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'videos' | 'likes'>('videos');
   const [showMenu, setShowMenu] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
   const { user: currentUser } = useAuthStore();
 
   const { data: profile, isLoading: profileLoading, error: profileError, refetch: refetchProfile } = useQuery(
@@ -137,9 +139,19 @@ export default function ProfilePage({ params }: ProfilePageProps) {
               {showMenu && (
                 <div className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-10">
                   <button
+                    onClick={() => {
+                      setShowMenu(false);
+                      setShowReportModal(true);
+                    }}
+                    className="w-full flex items-center gap-2 px-4 py-3 text-left hover:bg-gray-100 dark:hover:bg-gray-700 rounded-t-lg"
+                  >
+                    <Flag className="w-4 h-4" />
+                    Report @{user.username}
+                  </button>
+                  <button
                     onClick={() => blockMutation.mutate()}
                     disabled={blockMutation.isLoading}
-                    className="w-full flex items-center gap-2 px-4 py-3 text-left text-red-600 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg disabled:opacity-50"
+                    className="w-full flex items-center gap-2 px-4 py-3 text-left text-red-600 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-b-lg disabled:opacity-50"
                   >
                     <Ban className="w-4 h-4" />
                     {isBlocked ? 'Unblock' : 'Block'} @{user.username}
@@ -150,6 +162,9 @@ export default function ProfilePage({ params }: ProfilePageProps) {
           )}
           {isBlocked && !isOwnProfile && (
             <p className="text-sm text-red-600 mt-2">You have blocked this user.</p>
+          )}
+          {showReportModal && (
+            <ReportModal contentType="user" contentId={user.id} onClose={() => setShowReportModal(false)} />
           )}
 
           {isOwnProfile && (

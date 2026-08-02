@@ -4,8 +4,9 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
 import { commentApi } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
-import { Heart, Pin, Pencil, Trash2, MessageCircle } from 'lucide-react';
+import { Heart, Pin, Pencil, Trash2, MessageCircle, Flag } from 'lucide-react';
 import type { Comment } from '@/types';
+import ReportModal from './ReportModal';
 
 interface CommentSectionProps {
   videoId: string;
@@ -38,6 +39,7 @@ function CommentRow({
 }) {
   const queryClient = useQueryClient();
   const [isEditing, setIsEditing] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
   const [editContent, setEditContent] = useState(comment.content);
   const [isReplying, setIsReplying] = useState(false);
   const [replyContent, setReplyContent] = useState('');
@@ -172,6 +174,14 @@ function CommentRow({
                 <Trash2 className="w-3.5 h-3.5" />
               </button>
             )}
+            {!isOwnComment && (
+              <button
+                onClick={() => setShowReportModal(true)}
+                className="text-xs text-gray-500 hover:text-red-600"
+              >
+                <Flag className="w-3.5 h-3.5" />
+              </button>
+            )}
             {!isReply && isVideoOwner && (
               <button
                 onClick={() => pinMutation.mutate()}
@@ -223,6 +233,13 @@ function CommentRow({
                 />
               ))}
             </div>
+          )}
+          {showReportModal && (
+            <ReportModal
+              contentType="comment"
+              contentId={comment.id}
+              onClose={() => setShowReportModal(false)}
+            />
           )}
         </div>
       </div>

@@ -23,6 +23,7 @@ export interface User {
   website: string | null;
   is_creator: boolean;
   is_verified: boolean;
+  role: 'user' | 'creator' | 'admin';
   created_at: string;
 }
 
