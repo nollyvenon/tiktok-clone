@@ -12,7 +12,7 @@ from contextlib import asynccontextmanager
 
 from app.config import settings
 from app.database import init_db, close_db
-from app.routes import auth, profiles, videos, uploads, editor, ai, recommendations, search, hashtags
+from app.routes import auth, profiles, videos, uploads, editor, ai, recommendations, search, hashtags, notifications
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -88,6 +88,7 @@ app.include_router(ai.router, prefix="/api", tags=["AI Creator Studio"])
 app.include_router(recommendations.router, prefix="/api", tags=["Recommendations"])
 app.include_router(search.router, prefix="/api", tags=["Search & Discovery"])
 app.include_router(hashtags.router, prefix="/api", tags=["Hashtags & Trends"])
+app.include_router(notifications.router, prefix="/api", tags=["Notifications"])
 # TODO: Add more routers as they are implemented
 # app.include_router(videos.router, prefix="/api/videos", tags=["Videos"])
 # app.include_router(users.router, prefix="/api/users", tags=["Users"])

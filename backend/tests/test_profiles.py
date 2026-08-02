@@ -124,6 +124,17 @@ async def test_follow_user(test_client: AsyncClient, register_user_data):
     assert data["is_following"] is False
     assert data["followers_count"] == 0
 
+    # User 1 re-follows User 2 - the existing Follow row (is_active=False)
+    # must be reactivated, not just re-toggled off again
+    response = await test_client.post(
+        f"/api/profiles/{user2_id}/follow",
+        headers={"Authorization": f"Bearer {token1}"}
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["is_following"] is True
+    assert data["followers_count"] == 1
+
 
 @pytest.mark.asyncio
 async def test_cannot_follow_self(test_client: AsyncClient, register_user_data):

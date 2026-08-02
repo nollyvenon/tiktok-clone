@@ -15,8 +15,9 @@ from app.schemas import (
     BlockedUsersResponse, UserPublicProfile, ErrorResponse
 )
 from app.services.profiles import ProfileService
+from app.services.notifications import NotificationService
 from app.routes.auth import get_current_user
-from app.models import User
+from app.models import User, NotificationType
 
 logger = logging.getLogger(__name__)
 
@@ -235,6 +236,14 @@ async def follow_user(
         is_following, follower_count = await ProfileService.follow_user(
             db, current_user.id, user_id
         )
+        if is_following:
+            await NotificationService.send_notification(
+                db,
+                user_id=user_id,
+                notification_type=NotificationType.FOLLOW,
+                title=f"{current_user.username} started following you",
+                actor_id=current_user.id,
+            )
         return FollowResponse(
             is_following=is_following,
             followers_count=follower_count,

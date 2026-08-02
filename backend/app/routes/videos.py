@@ -16,8 +16,9 @@ from app.schemas import (
 )
 from app.services.videos import VideoService
 from app.services.profiles import ProfileService
+from app.services.notifications import NotificationService
 from app.routes.auth import get_current_user
-from app.models import User
+from app.models import User, NotificationType
 
 logger = logging.getLogger(__name__)
 
@@ -527,6 +528,17 @@ async def like_video(
     """
     try:
         is_liked, likes_count = await VideoService.like_video(db, current_user.id, video_id)
+        if is_liked:
+            video = await VideoService.get_video(db, video_id)
+            if video:
+                await NotificationService.send_notification(
+                    db,
+                    user_id=video.user_id,
+                    notification_type=NotificationType.LIKE,
+                    title=f"{current_user.username} liked your video",
+                    actor_id=current_user.id,
+                    related_video_id=video_id,
+                )
         return LikeResponse(is_liked=is_liked, likes_count=likes_count)
     except ValueError as e:
         raise HTTPException(

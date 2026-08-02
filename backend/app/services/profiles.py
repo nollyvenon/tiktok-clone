@@ -154,10 +154,12 @@ class ProfileService:
         follow = existing.scalar()
 
         if follow:
-            # Already following - unfollow
-            follow.is_active = False
+            # Toggle based on the row's current state - a previously
+            # unfollowed (is_active=False) row must be reactivated on
+            # re-follow, not treated as still-following and unfollowed again.
+            follow.is_active = not follow.is_active
             await db.commit()
-            is_following = False
+            is_following = follow.is_active
         else:
             # Create follow relationship
             follow = Follow(

@@ -1089,15 +1089,15 @@ class NotificationTypeEnum(str):
 
 
 class NotificationResponse(BaseModel):
-    """Notification response"""
+    """Notification response - fields match the Notification model exactly"""
     id: UUID
     user_id: UUID
     type: str
     actor_id: Optional[UUID] = None
     related_video_id: Optional[UUID] = None
+    related_comment_id: Optional[UUID] = None
     title: str
-    body: str
-    data: Optional[dict] = None
+    message: Optional[str] = None
     is_read: bool
     read_at: Optional[datetime] = None
     created_at: datetime
@@ -1107,20 +1107,22 @@ class NotificationResponse(BaseModel):
 
 
 class NotificationPreferenceResponse(BaseModel):
-    """Notification preferences response"""
+    """Notification preferences response - fields match the NotificationPreference model exactly"""
     id: UUID
     user_id: UUID
     push_enabled: bool
     email_enabled: bool
     in_app_enabled: bool
-    digest_frequency: str = "daily"
-    quiet_hours_start: Optional[str] = None
-    quiet_hours_end: Optional[str] = None
     follow_notifications: bool = True
     like_notifications: bool = True
     comment_notifications: bool = True
     mention_notifications: bool = True
     message_notifications: bool = True
+    email_digest_enabled: bool = True
+    email_digest_frequency: str = "daily"
+    quiet_hours_enabled: bool = False
+    quiet_hours_start: Optional[str] = None
+    quiet_hours_end: Optional[str] = None
     updated_at: datetime
 
     class Config:
@@ -1132,14 +1134,16 @@ class NotificationPreferenceUpdate(BaseModel):
     push_enabled: Optional[bool] = None
     email_enabled: Optional[bool] = None
     in_app_enabled: Optional[bool] = None
-    digest_frequency: Optional[str] = None
-    quiet_hours_start: Optional[str] = None
-    quiet_hours_end: Optional[str] = None
     follow_notifications: Optional[bool] = None
     like_notifications: Optional[bool] = None
     comment_notifications: Optional[bool] = None
     mention_notifications: Optional[bool] = None
     message_notifications: Optional[bool] = None
+    email_digest_enabled: Optional[bool] = None
+    email_digest_frequency: Optional[str] = None
+    quiet_hours_enabled: Optional[bool] = None
+    quiet_hours_start: Optional[str] = None
+    quiet_hours_end: Optional[str] = None
 
 
 class MarkNotificationReadRequest(BaseModel):
