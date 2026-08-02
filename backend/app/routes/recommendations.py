@@ -12,15 +12,66 @@ from app.database import get_db
 from app.schemas import (
     RecommendationsListResponse, RecommendationResponse,
     UserPreferenceResponse, UserPreferenceUpdate,
-    RecommendationFeedbackRequest, ABTestResponse, ErrorResponse
+    RecommendationFeedbackRequest, ABTestResponse, ErrorResponse,
+    VideoDetailResponse, UserPublicProfile, FeedResponse,
 )
 from app.services.recommendations import RecommendationService
+from app.services.profiles import ProfileService
 from app.routes.auth import get_current_user
-from app.models import User
+from app.models import User, Video
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/recommendations", tags=["Recommendations"])
+
+
+async def _build_video_response(db: AsyncSession, video) -> VideoDetailResponse:
+    """Builds a VideoDetailResponse (with nested author) for a bare Video row."""
+    author = await ProfileService.get_user_profile(db, video.user_id)
+    return VideoDetailResponse(
+        id=video.id,
+        user_id=video.user_id,
+        user=UserPublicProfile.from_orm(author),
+        title=video.title,
+        description=video.description,
+        video_url=video.video_url,
+        thumbnail_url=video.thumbnail_url,
+        duration=video.duration,
+        hashtags=video.hashtags,
+        location=video.location,
+        is_public=video.is_public,
+        views_count=video.views_count,
+        likes_count=video.likes_count,
+        comments_count=video.comments_count,
+        shares_count=video.shares_count,
+        bookmarks_count=video.bookmarks_count,
+        completion_rate=video.completion_rate,
+        created_at=video.created_at,
+        published_at=video.published_at,
+        allow_comments=video.allow_comments,
+        allow_duets=video.allow_duets,
+        allow_stitches=video.allow_stitches,
+    )
+
+
+async def _build_recommendation_response(db: AsyncSession, rec) -> RecommendationResponse:
+    """
+    Builds a RecommendationResponse for a Recommendation row.
+
+    Recommendation only has a video_id FK, not a populated `video`
+    relationship shaped like VideoDetailResponse - from_orm() can't
+    produce the required nested video on its own.
+    """
+    video = await db.get(Video, rec.video_id)
+    return RecommendationResponse(
+        id=rec.id,
+        video_id=rec.video_id,
+        score=rec.score,
+        algorithm=rec.algorithm,
+        reason=rec.reason,
+        video=await _build_video_response(db, video),
+        created_at=rec.created_at,
+    )
 
 
 # ============================================================================
@@ -63,7 +114,7 @@ async def get_for_you_feed(
         )
 
         return RecommendationsListResponse(
-            recommendations=[RecommendationResponse.from_orm(r) for r in recommendations],
+            recommendations=[await _build_recommendation_response(db, r) for r in recommendations],
             cursor=next_cursor,
             total=len(recommendations),
         )
@@ -122,7 +173,7 @@ async def compute_fresh_recommendations(
 
 @router.get(
     "/similar/{video_id}",
-    response_model=RecommendationsListResponse,
+    response_model=FeedResponse,
     responses={
         200: {"description": "Similar videos"},
         404: {"model": ErrorResponse, "description": "Video not found"},
@@ -143,14 +194,20 @@ async def get_similar_videos(
     - Similar genre/category
     - Similar engagement patterns
     - Co-viewed videos
+
+    Note: these are plain similarity matches, not scored Recommendation
+    records, so the response is a FeedResponse (a list of videos) rather
+    than a RecommendationsListResponse (which carries a score/algorithm
+    per item).
     """
     try:
         similar_videos = await RecommendationService.get_similar_videos(
             db, video_id, limit
         )
 
-        return RecommendationsListResponse(
-            recommendations=[{"video": v} for v in similar_videos],
+        return FeedResponse(
+            videos=[await _build_video_response(db, v) for v in similar_videos],
+            cursor=None,
             total=len(similar_videos),
         )
     except Exception as e:

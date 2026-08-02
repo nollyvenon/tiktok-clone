@@ -4,7 +4,7 @@ Recommendation engine API tests
 
 import pytest
 from httpx import AsyncClient
-from uuid import uuid4
+from uuid import uuid4, UUID
 
 
 @pytest.mark.asyncio
@@ -370,6 +370,107 @@ async def test_get_preferences_returns_defaults(test_client: AsyncClient, regist
     # Should have default values
     assert data["content_diversity_score"] == 0.5
     assert data["recency_preference"] == 0.5
+
+
+@pytest.mark.asyncio
+async def test_for_you_feed_with_real_recommendation_returns_video(
+    test_client: AsyncClient, test_db, register_user_data
+):
+    """
+    A For-You feed with an actual Recommendation row must serialize the
+    nested video with its author - Recommendation only has a video_id FK,
+    no `video` relationship, so a naive from_orm() would 500 here. No prior
+    test ever populated a real Recommendation row, so this path was never
+    exercised.
+    """
+    from app.models import Recommendation, User, Video, VideoStatus
+
+    register_response = await test_client.post("/api/auth/register", json=register_user_data)
+    access_token = register_response.json()["access_token"]
+    me_response = await test_client.get(
+        "/api/auth/me", headers={"Authorization": f"Bearer {access_token}"}
+    )
+    user_id = UUID(me_response.json()["id"])
+
+    creator = User(email="rec_creator@example.com", username="reccreator", password_hash="x", is_active=True)
+    test_db.add(creator)
+    await test_db.commit()
+
+    video = Video(
+        user_id=creator.id,
+        title="Recommended Video",
+        video_url="https://example.com/rec.mp4",
+        status=VideoStatus.PUBLISHED,
+        is_public=True,
+    )
+    test_db.add(video)
+    await test_db.commit()
+
+    rec = Recommendation(
+        user_id=user_id,
+        video_id=video.id,
+        score=0.9,
+        algorithm="collaborative",
+    )
+    test_db.add(rec)
+    await test_db.commit()
+
+    response = await test_client.get(
+        "/api/recommendations/for-you?limit=10",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total"] == 1
+    assert data["recommendations"][0]["video"]["title"] == "Recommended Video"
+    assert data["recommendations"][0]["video"]["user"]["username"] == "reccreator"
+    assert data["recommendations"][0]["score"] == 0.9
+
+
+@pytest.mark.asyncio
+async def test_similar_videos_route(test_client: AsyncClient, test_db, register_user_data):
+    """
+    /similar/{video_id} returns plain Video matches (not scored Recommendation
+    records) - must come back as a FeedResponse with a real author, not the
+    old {"video": v}-only dict that was missing every other required field.
+    """
+    from app.models import User, Video, VideoStatus
+
+    register_response = await test_client.post("/api/auth/register", json=register_user_data)
+    access_token = register_response.json()["access_token"]
+
+    creator = User(email="similar_creator@example.com", username="similarcreator", password_hash="x", is_active=True)
+    test_db.add(creator)
+    await test_db.commit()
+
+    source_video = Video(
+        user_id=creator.id,
+        title="Source Video",
+        hashtags="dance,fun",
+        video_url="https://example.com/source.mp4",
+        status=VideoStatus.PUBLISHED,
+        is_public=True,
+    )
+    similar_video = Video(
+        user_id=creator.id,
+        title="Similar Video",
+        hashtags="dance,fun",
+        video_url="https://example.com/similar.mp4",
+        status=VideoStatus.PUBLISHED,
+        is_public=True,
+    )
+    test_db.add(source_video)
+    test_db.add(similar_video)
+    await test_db.commit()
+    source_id = source_video.id
+
+    response = await test_client.get(
+        f"/api/recommendations/similar/{source_id}",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert any(v["title"] == "Similar Video" for v in data["videos"])
 
 
 if __name__ == "__main__":

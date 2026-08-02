@@ -154,3 +154,23 @@ async def test_get_challenge_videos_route_includes_author(test_client: AsyncClie
     data = response.json()
     assert data["total"] == 1
     assert data["videos"][0]["user"]["username"] == "challenger1"
+
+
+@pytest.mark.asyncio
+async def test_get_hashtag_analytics_route(test_client: AsyncClient, test_db):
+    from app.models import HashtagAnalytics
+
+    analytics = HashtagAnalytics(
+        hashtag="dance",
+        date=datetime.utcnow(),
+        usage_count=50,
+        unique_creators=10,
+    )
+    test_db.add(analytics)
+    await test_db.commit()
+
+    response = await test_client.get("/api/hashtags/dance/analytics", params={"days": 30})
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) >= 1
+    assert data[0]["hashtag"] == "dance"

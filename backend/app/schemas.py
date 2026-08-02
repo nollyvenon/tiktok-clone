@@ -1029,7 +1029,7 @@ class HashtagAnalyticsResponse(BaseModel):
     usage_count: int
     unique_creators: int
     total_views: int
-    total_likes: int
+    total_engagement: int
 
     class Config:
         from_attributes = True
