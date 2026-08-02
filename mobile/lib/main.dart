@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'providers/auth_provider.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/auth/register_screen.dart';
+import 'screens/discover/discover_screen.dart';
 import 'screens/feed/feed_screen.dart';
 import 'screens/profile/profile_screen.dart';
 import 'screens/upload/drafts_screen.dart';
@@ -59,12 +60,16 @@ class TikTokCloneApp extends StatelessWidget {
           builder: (context, state) => const MainShell(initialTab: 0),
         ),
         GoRoute(
-          path: '/drafts',
+          path: '/discover',
           builder: (context, state) => const MainShell(initialTab: 1),
         ),
         GoRoute(
-          path: '/profile',
+          path: '/drafts',
           builder: (context, state) => const MainShell(initialTab: 2),
+        ),
+        GoRoute(
+          path: '/profile',
+          builder: (context, state) => const MainShell(initialTab: 3),
         ),
       ],
     );
@@ -90,6 +95,7 @@ class _MainShellState extends State<MainShell> {
   Widget build(BuildContext context) {
     final screens = [
       const FeedScreen(),
+      const DiscoverScreen(),
       const DraftsScreen(),
       const ProfileScreen(),
     ];
@@ -101,6 +107,7 @@ class _MainShellState extends State<MainShell> {
         onDestinationSelected: (index) => setState(() => _currentTab = index),
         destinations: const [
           NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: 'Feed'),
+          NavigationDestination(icon: Icon(Icons.explore_outlined), selectedIcon: Icon(Icons.explore), label: 'Discover'),
           NavigationDestination(icon: Icon(Icons.video_library_outlined), selectedIcon: Icon(Icons.video_library), label: 'Drafts'),
           NavigationDestination(icon: Icon(Icons.person_outline), selectedIcon: Icon(Icons.person), label: 'Profile'),
         ],
