@@ -3,7 +3,7 @@
 import { useQuery } from 'react-query';
 import Link from 'next/link';
 import { videoApi } from '@/lib/api';
-import { Loader2, AlertCircle, Eye, Heart, MessageCircle, Users, BarChart3, DollarSign, Handshake, Store } from 'lucide-react';
+import { Loader2, AlertCircle, Eye, Heart, MessageCircle, Users, BarChart3, DollarSign, Handshake, Store, Wallet } from 'lucide-react';
 
 function StatCard({ label, value, icon: Icon }: { label: string; value: string | number; icon: typeof Eye }) {
   return (
@@ -70,6 +70,13 @@ export default function DashboardPage() {
             >
               <Store className="w-4 h-4" />
               My Shop
+            </Link>
+            <Link
+              href="/monetization"
+              className="flex items-center gap-1.5 text-sm font-semibold text-pink-600 hover:text-pink-700"
+            >
+              <Wallet className="w-4 h-4" />
+              Monetization
             </Link>
           </div>
         </div>

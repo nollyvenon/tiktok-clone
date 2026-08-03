@@ -1469,6 +1469,69 @@ export const shopApi = {
   },
 };
 
+export interface Earning {
+  id: string;
+  source_type: 'creator_fund' | 'shop_order';
+  fund_application_id: string | null;
+  shop_order_id: string | null;
+  amount: number;
+  created_at: string;
+}
+
+export interface EarningsSummary {
+  total_earned: number;
+  total_paid_out: number;
+  pending_payout_total: number;
+  available_balance: number;
+  earnings: Earning[];
+}
+
+export interface Payout {
+  id: string;
+  user_id: string;
+  amount: number;
+  status: 'pending' | 'completed' | 'cancelled';
+  notes: string | null;
+  requested_at: string;
+  decided_at: string | null;
+}
+
+export interface PayoutListResult {
+  payouts: Payout[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export const monetizationApi = {
+  getSummary: async () => {
+    const res = await client.get<EarningsSummary>('/api/monetization/summary');
+    return res.data;
+  },
+
+  requestPayout: async (amount: number) => {
+    const res = await client.post<Payout>('/api/monetization/payouts', { amount });
+    return res.data;
+  },
+
+  getMyPayouts: async () => {
+    const res = await client.get<Payout[]>('/api/monetization/payouts/me');
+    return res.data;
+  },
+
+  listPayouts: async (status?: string, limit = 20, offset = 0) => {
+    const res = await client.get<PayoutListResult>('/api/monetization/admin/payouts', {
+      params: { status, limit, offset },
+    });
+    return res.data;
+  },
+
+  decidePayout: async (payoutId: string, status: 'completed' | 'cancelled', notes?: string) => {
+    const res = await client.post<Payout>(`/api/monetization/admin/payouts/${payoutId}/decide`, { status, notes });
+    return res.data;
+  },
+};
+
 export const adminApi = {
   getStats: async () => {
     const res = await client.get<AdminStats>('/api/admin/stats');

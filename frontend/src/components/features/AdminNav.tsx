@@ -9,6 +9,7 @@ const TABS = [
   { href: '/admin/moderation', label: 'Reports' },
   { href: '/admin/audit-log', label: 'Audit Log' },
   { href: '/admin/creator-fund', label: 'Creator Fund' },
+  { href: '/admin/payouts', label: 'Payouts' },
 ];
 
 export default function AdminNav() {
