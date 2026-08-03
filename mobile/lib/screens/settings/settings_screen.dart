@@ -7,6 +7,7 @@ import '../notifications/notification_settings_screen.dart';
 import 'preferences_screen.dart';
 import 'account_settings_screen.dart';
 import 'blocked_users_screen.dart';
+import '../shop/my_orders_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -56,6 +57,14 @@ class SettingsScreen extends StatelessWidget {
             trailing: const Icon(Icons.chevron_right),
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const TwoFactorSetupScreen()),
+            ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.receipt_long_outlined),
+            title: const Text('My Orders'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const MyOrdersScreen()),
             ),
           ),
           const Divider(),

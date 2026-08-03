@@ -10,7 +10,9 @@ import '../dashboard/dashboard_screen.dart';
 import '../messages/messages_screen.dart';
 import '../messages/chat_detail_screen.dart';
 import '../../services/message_service.dart';
+import '../../services/shop_service.dart';
 import '../../widgets/report_sheet.dart';
+import '../shop/shop_screen.dart';
 import 'edit_profile_screen.dart';
 import 'follow_list_screen.dart';
 
@@ -26,6 +28,8 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   final _profileService = ProfileService();
   final _messageService = MessageService();
+  final _shopService = ShopService();
+  String? _shopId;
   ProfileDetail? _profile;
   bool _isLoading = true;
   bool _isFollowActionPending = false;
@@ -54,6 +58,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (targetId == null) throw Exception('No user to load');
       final profile = await _profileService.getProfile(targetId);
       setState(() => _profile = profile);
+      if (widget.userId != null) {
+        _shopService.getShopByUser(targetId).then((data) {
+          if (mounted && data != null) setState(() => _shopId = data.shop.id);
+        }).catchError((_) {});
+      }
     } catch (e) {
       setState(() => _error = e.toString());
     } finally {
@@ -261,6 +270,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
         else
           Row(
             children: [
+              if (_shopId != null) ...[
+                SizedBox(
+                  height: 44,
+                  width: 44,
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => ShopScreen(shopId: _shopId!)),
+                    ),
+                    style: OutlinedButton.styleFrom(padding: EdgeInsets.zero),
+                    child: const Icon(Icons.storefront_outlined, size: 18),
+                  ),
+                ),
+                const SizedBox(width: 8),
+              ],
               Expanded(
                 child: SizedBox(
                   height: 44,

@@ -5,6 +5,7 @@ import '../../services/feed_service.dart';
 import '../../services/auth_service.dart';
 import '../creator_fund/creator_fund_screen.dart';
 import '../collaborations/collaborations_screen.dart';
+import '../shop/manage_shop_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -60,6 +61,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
             tooltip: 'Collaborations',
             onPressed: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const CollaborationsScreen()),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.storefront_outlined),
+            tooltip: 'My Shop',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const ManageShopScreen()),
             ),
           ),
         ],
