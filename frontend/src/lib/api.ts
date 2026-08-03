@@ -451,6 +451,18 @@ export interface AICreditsInfo {
 }
 
 // AI Creator Studio endpoints (Module 6)
+export interface FilterPreset {
+  id: string;
+  name: string;
+  label: string;
+  thumbnail_url: string | null;
+  brightness: number;
+  contrast: number;
+  saturation: number;
+  hue: number;
+  temperature: number;
+}
+
 export const aiApi = {
   getCredits: async () => {
     const res = await client.get<AICreditsInfo>('/api/ai/credits');
@@ -498,9 +510,16 @@ export const aiApi = {
     brightness?: number;
     contrast?: number;
     saturation?: number;
+    hue?: number;
+    temperature?: number;
   }) => {
     const res = await client.post('/api/ai/color-correction', data);
     return res.data;
+  },
+
+  getFilterPresets: async () => {
+    const res = await client.get<{ presets: FilterPreset[] }>('/api/ai/filters/presets');
+    return res.data.presets;
   },
 
   getFrameSuggestions: async (segmentId: string, targetAspectRatio = '9:16') => {

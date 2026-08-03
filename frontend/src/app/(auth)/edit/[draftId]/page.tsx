@@ -5,7 +5,7 @@ import {
   Loader2, Trash2, Wand2, Scissors, Volume2, VolumeX, Type, Download, Sparkles,
   Smile, ArrowUp, ArrowDown, Mic, Music,
 } from 'lucide-react';
-import { editorApi, aiApi, uploadApi, type EditorState, type Segment, type Sticker, type SoundRecommendation } from '@/lib/api';
+import { editorApi, aiApi, uploadApi, type EditorState, type Segment, type Sticker, type SoundRecommendation, type FilterPreset } from '@/lib/api';
 
 interface EditPageProps {
   params: { draftId: string };
@@ -54,6 +54,10 @@ export default function EditPage({ params }: EditPageProps) {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.draftId]);
+
+  useEffect(() => {
+    aiApi.getFilterPresets().then(setFilterPresets).catch(() => {});
+  }, []);
 
   const updateSegment = (updated: Segment) => {
     setState((prev) =>
@@ -157,6 +161,8 @@ export default function EditPage({ params }: EditPageProps) {
   };
 
   const [aiStatus, setAiStatus] = useState<Record<string, string>>({});
+  const [filterPresets, setFilterPresets] = useState<FilterPreset[]>([]);
+  const [appliedFilterBySegment, setAppliedFilterBySegment] = useState<Record<string, string>>({});
   const [sounds, setSounds] = useState<SoundRecommendation[]>([]);
   const [soundsLoading, setSoundsLoading] = useState(false);
   const [soundsLoaded, setSoundsLoaded] = useState(false);
@@ -223,6 +229,26 @@ export default function EditPage({ params }: EditPageProps) {
       setAiStatus((prev) => ({ ...prev, [segmentId]: 'Captions queued' }));
     } catch {
       setAiStatus((prev) => ({ ...prev, [segmentId]: 'Caption generation failed' }));
+    }
+  };
+
+  const handleApplyFilterPreset = async (segmentId: string, preset: FilterPreset) => {
+    setAiStatus((prev) => ({ ...prev, [segmentId]: `Applying ${preset.label}...` }));
+    try {
+      await aiApi.applyColorCorrection({
+        segment_id: segmentId,
+        method: 'preset',
+        preset_name: preset.name,
+        brightness: preset.brightness,
+        contrast: preset.contrast,
+        saturation: preset.saturation,
+        hue: preset.hue,
+        temperature: preset.temperature,
+      });
+      setAppliedFilterBySegment((prev) => ({ ...prev, [segmentId]: preset.name }));
+      setAiStatus((prev) => ({ ...prev, [segmentId]: `${preset.label} filter queued` }));
+    } catch {
+      setAiStatus((prev) => ({ ...prev, [segmentId]: 'Failed to apply filter' }));
     }
   };
 
@@ -423,6 +449,35 @@ export default function EditPage({ params }: EditPageProps) {
                         </button>
                       </span>
                     ))}
+                  </div>
+                )}
+
+                {filterPresets.length > 0 && (
+                  <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-800">
+                    <p className="text-xs font-semibold text-gray-500 mb-2">Filters</p>
+                    <div className="flex flex-wrap gap-2">
+                      {filterPresets.map((preset) => {
+                        const isApplied = appliedFilterBySegment[segment.id] === preset.name;
+                        const previewFilter = `brightness(${1 + preset.brightness / 100}) contrast(${1 + preset.contrast / 100}) saturate(${1 + preset.saturation / 100}) hue-rotate(${preset.hue}deg)`;
+                        return (
+                          <button
+                            key={preset.id}
+                            onClick={() => handleApplyFilterPreset(segment.id, preset)}
+                            className={`flex flex-col items-center gap-1 px-2 py-1.5 rounded-lg border text-xs ${
+                              isApplied
+                                ? 'border-pink-600 text-pink-600'
+                                : 'border-gray-200 dark:border-gray-700 hover:border-gray-300'
+                            }`}
+                          >
+                            <span
+                              className="w-8 h-8 rounded-full bg-gradient-to-br from-pink-300 to-purple-400"
+                              style={{ filter: previewFilter }}
+                            />
+                            {preset.label}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
 
