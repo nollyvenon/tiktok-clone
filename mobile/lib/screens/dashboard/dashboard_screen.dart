@@ -6,6 +6,7 @@ import '../../services/auth_service.dart';
 import '../creator_fund/creator_fund_screen.dart';
 import '../collaborations/collaborations_screen.dart';
 import '../shop/manage_shop_screen.dart';
+import '../monetization/monetization_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -68,6 +69,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
             tooltip: 'My Shop',
             onPressed: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const ManageShopScreen()),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.account_balance_wallet_outlined),
+            tooltip: 'Monetization',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const MonetizationScreen()),
             ),
           ),
         ],
