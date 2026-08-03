@@ -94,6 +94,19 @@ class ProfileService {
     }
   }
 
+  Future<List<User>> searchCreators(String query, {int limit = 5}) async {
+    try {
+      final response = await _dio.get('/api/search/creators', queryParameters: {
+        'q': query,
+        'limit': limit,
+      });
+      final items = response.data['results'] as List;
+      return items.map((e) => User.fromJson(e as Map<String, dynamic>)).toList();
+    } on DioException catch (e) {
+      throw ApiException(_extractError(e, 'Search failed'));
+    }
+  }
+
   Future<List<User>> getBlockedUsers() async {
     try {
       final response = await _dio.get('/api/profiles/me/blocked');

@@ -99,6 +99,20 @@ class FeedService {
     }
   }
 
+  Future<List<Video>> getUserVideos(String userId, {int limit = 50, int offset = 0}) async {
+    try {
+      final response = await _dio.get('/api/videos/user/$userId/videos', queryParameters: {
+        'limit': limit,
+        'offset': offset,
+      });
+      return (response.data['videos'] as List)
+          .map((e) => Video.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } on DioException catch (e) {
+      throw ApiException(_extractError(e, 'Failed to load your videos'));
+    }
+  }
+
   String _extractError(DioException e, String fallback) {
     final data = e.response?.data;
     if (data is Map && data['detail'] != null) {
