@@ -23,6 +23,7 @@ import {
   Bell,
   Bookmark,
   BarChart3,
+  Settings,
 } from 'lucide-react';
 
 export function Navbar() {
@@ -167,6 +168,13 @@ export function Navbar() {
                   <BarChart3 className="w-4 h-4" />
                   <span>Dashboard</span>
                 </Link>
+                <Link
+                  href="/settings/account"
+                  className="flex items-center gap-2 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700"
+                >
+                  <Settings className="w-4 h-4" />
+                  <span>Settings</span>
+                </Link>
                 <button
                   onClick={handleLogout}
                   className="w-full flex items-center gap-2 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-b-lg text-red-600 dark:text-red-400"
@@ -237,6 +245,13 @@ export function Navbar() {
             >
               <BarChart3 className="w-5 h-5" />
               <span>Dashboard</span>
+            </Link>
+            <Link
+              href="/settings/account"
+              className="flex items-center gap-2 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded"
+            >
+              <Settings className="w-5 h-5" />
+              <span>Settings</span>
             </Link>
             <button
               onClick={handleLogout}

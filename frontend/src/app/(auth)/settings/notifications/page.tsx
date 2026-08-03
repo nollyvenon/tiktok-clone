@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Loader2, CheckCircle2 } from 'lucide-react';
 import { notificationApi, type NotificationPreferences } from '@/lib/api';
+import SettingsNav from '@/components/features/SettingsNav';
 
 const TYPE_TOGGLES: Array<{ key: keyof NotificationPreferences; label: string }> = [
   { key: 'follow_notifications', label: 'New followers' },
@@ -73,6 +74,7 @@ export default function NotificationSettingsPage() {
   return (
     <div className="min-h-screen bg-white dark:bg-gray-900 py-12 px-4">
       <div className="max-w-md mx-auto">
+        <SettingsNav />
         <h1 className="text-3xl font-bold mb-2">Notification settings</h1>
         <p className="text-gray-600 dark:text-gray-400 mb-8">Choose what you get notified about</p>
 

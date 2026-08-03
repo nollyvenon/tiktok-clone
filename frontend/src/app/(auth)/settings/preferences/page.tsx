@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Loader2, CheckCircle2 } from 'lucide-react';
 import { recommendationApi, type UserPreferences } from '@/lib/api';
+import SettingsNav from '@/components/features/SettingsNav';
 
 export default function PreferencesPage() {
   const [prefs, setPrefs] = useState<UserPreferences | null>(null);
@@ -60,6 +61,7 @@ export default function PreferencesPage() {
   return (
     <div className="min-h-screen bg-white dark:bg-gray-900 py-12 px-4">
       <div className="max-w-md mx-auto">
+        <SettingsNav />
         <h1 className="text-3xl font-bold mb-2">For You Preferences</h1>
         <p className="text-gray-600 dark:text-gray-400 mb-8">
           Tune how your For You feed is personalized

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { AlertCircle, CheckCircle2, Loader2, Copy, RefreshCw } from 'lucide-react';
 import { authApi } from '@/lib/api';
+import SettingsNav from '@/components/features/SettingsNav';
 
 export default function TwoFactorPage() {
   const [qrCode, setQrCode] = useState<string | null>(null);
@@ -69,6 +70,7 @@ export default function TwoFactorPage() {
   return (
     <div className="min-h-screen bg-white dark:bg-gray-900 py-12 px-4">
       <div className="max-w-md mx-auto">
+        <SettingsNav />
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
           Two-Factor Authentication
         </h1>

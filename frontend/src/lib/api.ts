@@ -73,6 +73,15 @@ export const authApi = {
     });
   },
 
+  exportMyData: async () => {
+    const res = await client.get('/api/auth/me/export');
+    return res.data;
+  },
+
+  deleteAccount: async (password: string) => {
+    await client.delete('/api/auth/me', { data: { password } });
+  },
+
   requestPasswordReset: async (email: string) => {
     await client.post('/api/auth/password-reset', { email });
   },
@@ -181,7 +190,7 @@ export const profileApi = {
   },
 
   getBlockedUsers: async () => {
-    const res = await client.get('/api/profiles/me/blocked');
+    const res = await client.get<{ users: PublicUser[]; total: number }>('/api/profiles/me/blocked');
     return res.data;
   },
 };
