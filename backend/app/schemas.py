@@ -67,6 +67,20 @@ class PasswordChangeRequest(BaseModel):
     confirm_password: str
 
 
+class AccountDeleteRequest(BaseModel):
+    """Confirm account deletion with the current password"""
+    password: str
+
+
+class DataExportResponse(BaseModel):
+    """A user's own data, exported on request"""
+    profile: dict
+    videos: List[dict]
+    comments: List[dict]
+    notification_preferences: Optional[dict] = None
+    exported_at: datetime = Field(default_factory=datetime.utcnow)
+
+
 class PasswordResetRequest(BaseModel):
     """Password reset request (forgot password)"""
     email: EmailStr

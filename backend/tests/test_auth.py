@@ -415,3 +415,80 @@ async def test_change_password_mismatch(test_client: AsyncClient, register_user_
     )
 
     assert response.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_export_my_data(test_client: AsyncClient, register_user_data):
+    register_response = await test_client.post("/api/auth/register", json=register_user_data)
+    access_token = register_response.json()["access_token"]
+
+    video_response = await test_client.post(
+        "/api/videos",
+        json={"title": "Exportable video", "video_url": "https://example.com/export.mp4"},
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    video_id = video_response.json()["id"]
+
+    await test_client.post(
+        f"/api/videos/{video_id}/comments",
+        json={"content": "My own comment"},
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    response = await test_client.get("/api/auth/me/export", headers={"Authorization": f"Bearer {access_token}"})
+    assert response.status_code == 200
+    data = response.json()
+    assert data["profile"]["email"] == register_user_data["email"]
+    assert len(data["videos"]) == 1
+    assert data["videos"][0]["title"] == "Exportable video"
+    assert len(data["comments"]) == 1
+    assert data["comments"][0]["content"] == "My own comment"
+
+
+@pytest.mark.asyncio
+async def test_export_requires_auth(test_client: AsyncClient):
+    response = await test_client.get("/api/auth/me/export")
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_delete_account_requires_correct_password(test_client: AsyncClient, register_user_data):
+    register_response = await test_client.post("/api/auth/register", json=register_user_data)
+    access_token = register_response.json()["access_token"]
+
+    response = await test_client.request(
+        "DELETE",
+        "/api/auth/me",
+        json={"password": "WrongPassword@123"},
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert response.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_delete_account_success_and_revokes_login(test_client: AsyncClient, register_user_data):
+    register_response = await test_client.post("/api/auth/register", json=register_user_data)
+    access_token = register_response.json()["access_token"]
+
+    response = await test_client.request(
+        "DELETE",
+        "/api/auth/me",
+        json={"password": register_user_data["password"]},
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert response.status_code == 200
+
+    login_response = await test_client.post(
+        "/api/auth/login",
+        json={"email": register_user_data["email"], "password": register_user_data["password"]},
+    )
+    assert login_response.status_code == 401
+
+    me_response = await test_client.get("/api/auth/me", headers={"Authorization": f"Bearer {access_token}"})
+    assert me_response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_delete_account_requires_auth(test_client: AsyncClient):
+    response = await test_client.request("DELETE", "/api/auth/me", json={"password": "whatever"})
+    assert response.status_code == 401

@@ -399,6 +399,100 @@ class AuthService:
         logger.info(f"Password changed for user: {user_id}")
 
     @staticmethod
+    async def delete_account(db: AsyncSession, user_id: UUID, password: str) -> None:
+        """
+        Soft-delete the current user's own account and revoke every active
+        session, so existing access/refresh tokens stop working
+        immediately rather than remaining valid until they expire.
+
+        Raises:
+            ValueError: If the user doesn't exist or the password is wrong.
+        """
+        result = await db.execute(select(User).where(User.id == user_id))
+        user = result.scalar()
+        if not user:
+            raise ValueError("User not found")
+
+        if not verify_password(password, user.password_hash):
+            raise ValueError("Password is incorrect")
+
+        user.is_active = False
+        user.deleted_at = datetime.utcnow()
+
+        sessions_result = await db.execute(
+            select(Session).where(and_(Session.user_id == user_id, Session.is_active == True))
+        )
+        for session in sessions_result.scalars().all():
+            session.is_active = False
+
+        await db.commit()
+        logger.info(f"Account deleted (soft) for user: {user_id}")
+
+    @staticmethod
+    async def export_user_data(db: AsyncSession, user_id: UUID) -> dict:
+        """Aggregate the user's own profile, videos, and comments into a
+        single exportable payload - a self-service alternative to a
+        support request for "what data do you have on me"."""
+        from app.models import Video, Comment, NotificationPreference
+
+        user = await db.get(User, user_id)
+        if not user:
+            raise ValueError("User not found")
+
+        videos_result = await db.execute(
+            select(Video).where(and_(Video.user_id == user_id, Video.deleted_at.is_(None)))
+        )
+        comments_result = await db.execute(
+            select(Comment).where(and_(Comment.user_id == user_id, Comment.deleted_at.is_(None)))
+        )
+        prefs_result = await db.execute(
+            select(NotificationPreference).where(NotificationPreference.user_id == user_id)
+        )
+        prefs = prefs_result.scalar()
+
+        return {
+            "profile": {
+                "id": str(user.id),
+                "email": user.email,
+                "username": user.username,
+                "first_name": user.first_name,
+                "last_name": user.last_name,
+                "bio": user.bio,
+                "created_at": user.created_at.isoformat(),
+            },
+            "videos": [
+                {
+                    "id": str(v.id),
+                    "title": v.title,
+                    "description": v.description,
+                    "video_url": v.video_url,
+                    "views_count": v.views_count,
+                    "likes_count": v.likes_count,
+                    "created_at": v.created_at.isoformat(),
+                }
+                for v in videos_result.scalars().all()
+            ],
+            "comments": [
+                {
+                    "id": str(c.id),
+                    "video_id": str(c.video_id),
+                    "content": c.content,
+                    "created_at": c.created_at.isoformat(),
+                }
+                for c in comments_result.scalars().all()
+            ],
+            "notification_preferences": (
+                {
+                    "push_enabled": prefs.push_enabled,
+                    "email_enabled": prefs.email_enabled,
+                    "in_app_enabled": prefs.in_app_enabled,
+                }
+                if prefs
+                else None
+            ),
+        }
+
+    @staticmethod
     async def request_password_reset(
         db: AsyncSession,
         request: PasswordResetRequest,

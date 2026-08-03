@@ -14,7 +14,8 @@ from app.schemas import (
     RefreshTokenRequest, LogoutRequest, PasswordChangeRequest,
     PasswordResetRequest, PasswordResetConfirm, ErrorResponse,
     SendOTPRequest, VerifyOTPRequest, TwoFactorSetupRequest, TwoFactorVerifyRequest,
-    OAuthCallbackRequest, SessionResponse, SessionsListResponse
+    OAuthCallbackRequest, SessionResponse, SessionsListResponse,
+    AccountDeleteRequest, DataExportResponse,
 )
 from app.services.auth import AuthService
 from app.services.oauth import OAuthService, OAuthProviderConfig
@@ -567,6 +568,52 @@ async def change_password(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Password change failed",
         )
+
+
+@router.get(
+    "/me/export",
+    response_model=DataExportResponse,
+    responses={401: {"model": ErrorResponse, "description": "Unauthorized"}},
+)
+async def export_my_data(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Export the current user's own data (profile, videos, comments,
+    notification preferences) as a single JSON payload.
+
+    **Authorization:** Requires valid access token
+    """
+    data = await AuthService.export_user_data(db, current_user.id)
+    return DataExportResponse(**data)
+
+
+@router.delete(
+    "/me",
+    status_code=status.HTTP_200_OK,
+    responses={
+        400: {"model": ErrorResponse, "description": "Incorrect password"},
+        401: {"model": ErrorResponse, "description": "Unauthorized"},
+    },
+)
+async def delete_my_account(
+    request: AccountDeleteRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Permanently deactivate the current user's own account (soft delete)
+    and revoke all active sessions. Requires the current password as
+    confirmation.
+
+    **Authorization:** Requires valid access token
+    """
+    try:
+        await AuthService.delete_account(db, current_user.id, request.password)
+        return {"message": "Account deleted"}
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
 # ============================================================================
