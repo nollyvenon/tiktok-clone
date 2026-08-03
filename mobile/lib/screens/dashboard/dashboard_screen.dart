@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../models/dashboard.dart';
 import '../../services/feed_service.dart';
 import '../../services/auth_service.dart';
+import '../creator_fund/creator_fund_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -43,7 +44,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Creator Dashboard')),
+      appBar: AppBar(
+        title: const Text('Creator Dashboard'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.attach_money),
+            tooltip: 'Creator Fund',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const CreatorFundScreen()),
+            ),
+          ),
+        ],
+      ),
       body: RefreshIndicator(
         onRefresh: _load,
         child: _isLoading
