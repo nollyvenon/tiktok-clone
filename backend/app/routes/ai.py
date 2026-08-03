@@ -18,6 +18,7 @@ from app.schemas import (
     TrendSuggestionsListResponse, TrendSuggestionResponse,
     AIGenerationResponse, AICreditsResponse, AIOperationHistoryResponse,
     ErrorResponse, FeedResponse, VideoDetailResponse, UserPublicProfile, MusicPreview,
+    FilterPresetListResponse, FilterPresetResponse,
 )
 from app.services.ai import AIService
 from app.services.uploads import UploadService
@@ -580,6 +581,16 @@ async def get_videos_using_sound(
 # ============================================================================
 # Color Correction
 # ============================================================================
+
+@router.get("/filters/presets", response_model=FilterPresetListResponse)
+async def list_filter_presets(db: AsyncSession = Depends(get_db)):
+    """List named color-grade filter presets, for use with the
+    color-correction endpoint's method='preset'"""
+    presets = await AIService.list_filter_presets(db)
+    return FilterPresetListResponse(
+        presets=[FilterPresetResponse.model_validate(p) for p in presets]
+    )
+
 
 @router.post(
     "/color-correction",

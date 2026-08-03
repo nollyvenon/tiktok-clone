@@ -629,6 +629,73 @@ async def test_get_color_correction_status(test_client: AsyncClient, register_us
 
 
 @pytest.mark.asyncio
+async def test_list_filter_presets(test_client: AsyncClient):
+    """Filter presets are public and seeded on first request"""
+    response = await test_client.get("/api/ai/filters/presets")
+    assert response.status_code == 200
+    data = response.json()
+    names = [p["name"] for p in data["presets"]]
+    assert "original" in names
+    assert "cinematic" in names
+    assert "black_and_white" in names
+
+
+@pytest.mark.asyncio
+async def test_filter_presets_are_stable_across_requests(test_client: AsyncClient):
+    """Seeding on an empty table must not duplicate presets on repeat calls"""
+    first = await test_client.get("/api/ai/filters/presets")
+    second = await test_client.get("/api/ai/filters/presets")
+    assert len(first.json()["presets"]) == len(second.json()["presets"])
+
+
+@pytest.mark.asyncio
+async def test_apply_preset_filter_matches_preset_values(test_client: AsyncClient, register_user_data):
+    """Applying a named preset should be usable end-to-end through the
+    existing color-correction endpoint with the preset's own adjustments"""
+    response = await test_client.post("/api/auth/register", json=register_user_data)
+    access_token = response.json()["access_token"]
+
+    response = await test_client.post(
+        "/api/uploads/drafts",
+        json={"title": "Filter Test Video"},
+        headers={"Authorization": f"Bearer {access_token}"}
+    )
+    draft_id = response.json()["id"]
+
+    response = await test_client.post(
+        f"/api/editor/drafts/{draft_id}/segments",
+        json={
+            "start_time": 0,
+            "end_time": 5000,
+            "content_type": "video",
+            "content_url": "https://example.com/video.mp4",
+        },
+        headers={"Authorization": f"Bearer {access_token}"}
+    )
+    segment_id = response.json()["id"]
+
+    presets_response = await test_client.get("/api/ai/filters/presets")
+    vivid = next(p for p in presets_response.json()["presets"] if p["name"] == "vivid")
+
+    response = await test_client.post(
+        "/api/ai/color-correction",
+        json={
+            "segment_id": segment_id,
+            "method": "preset",
+            "preset_name": vivid["name"],
+            "brightness": vivid["brightness"],
+            "contrast": vivid["contrast"],
+            "saturation": vivid["saturation"],
+            "hue": vivid["hue"],
+            "temperature": vivid["temperature"],
+        },
+        headers={"Authorization": f"Bearer {access_token}"}
+    )
+    assert response.status_code == 202
+    assert response.json()["preset_name"] == "vivid"
+
+
+@pytest.mark.asyncio
 async def test_get_frame_suggestions(test_client: AsyncClient, register_user_data):
     """Test smart framing suggestions"""
     # Register and login

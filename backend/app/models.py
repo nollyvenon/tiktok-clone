@@ -1420,3 +1420,31 @@ class Collaborator(Base):
     __table_args__ = (
         UniqueConstraint('collaboration_id', 'user_id', name='unique_collaboration_participant'),
     )
+
+
+# ============================================================================
+# MODULE 21: VIDEO FILTERS
+# ============================================================================
+
+class FilterPreset(Base):
+    """A named color-grade look, applied via the existing color correction
+    pipeline (method='preset'). No GPU/AR processing exists in this app,
+    so this covers color-grade filters honestly - beauty/AR face filters
+    are out of scope without a real vision pipeline."""
+    __tablename__ = "filter_presets"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name = Column(String(100), unique=True, nullable=False)
+    label = Column(String(100), nullable=False)
+    thumbnail_url = Column(String(500), nullable=True)
+
+    brightness = Column(Integer, default=0, nullable=False)  # -100 to 100
+    contrast = Column(Integer, default=0, nullable=False)    # -100 to 100
+    saturation = Column(Integer, default=0, nullable=False)  # -100 to 100
+    hue = Column(Integer, default=0, nullable=False)         # -180 to 180
+    temperature = Column(Integer, default=0, nullable=False) # -100 to 100
+
+    sort_order = Column(Integer, default=0, nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False)
+
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)

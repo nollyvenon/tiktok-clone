@@ -13,7 +13,7 @@ import json
 from app.models import (
     AIGeneration, AIGenerationStatus, BackgroundRemoval, Voiceover,
     AutoCaption, SoundRecommendation, ColorCorrection, AutoFrame,
-    TrendSuggestion, Segment, Draft
+    TrendSuggestion, Segment, Draft, FilterPreset
 )
 from app.schemas import (
     BackgroundRemovalRequest, VoiceoverRequest, AutoCaptionRequest,
@@ -21,6 +21,21 @@ from app.schemas import (
 )
 
 logger = logging.getLogger(__name__)
+
+# Canonical filter presets, seeded into the filter_presets table the first
+# time it's queried empty (covers both the SQLite test fixture, which uses
+# Base.metadata.create_all with no data, and a fresh Postgres deployment
+# before its migration-time bulk insert has been reviewed/edited).
+DEFAULT_FILTER_PRESETS = [
+    {"name": "original", "label": "Original", "brightness": 0, "contrast": 0, "saturation": 0, "hue": 0, "temperature": 0, "sort_order": 0},
+    {"name": "cinematic", "label": "Cinematic", "brightness": -5, "contrast": 20, "saturation": -10, "hue": 0, "temperature": -15, "sort_order": 1},
+    {"name": "vintage", "label": "Vintage", "brightness": 5, "contrast": -10, "saturation": -30, "hue": 10, "temperature": 20, "sort_order": 2},
+    {"name": "black_and_white", "label": "Black & White", "brightness": 0, "contrast": 15, "saturation": -100, "hue": 0, "temperature": 0, "sort_order": 3},
+    {"name": "warm", "label": "Warm", "brightness": 5, "contrast": 0, "saturation": 10, "hue": 0, "temperature": 30, "sort_order": 4},
+    {"name": "cool", "label": "Cool", "brightness": 0, "contrast": 0, "saturation": 5, "hue": 0, "temperature": -30, "sort_order": 5},
+    {"name": "vivid", "label": "Vivid", "brightness": 5, "contrast": 15, "saturation": 35, "hue": 0, "temperature": 0, "sort_order": 6},
+    {"name": "dramatic", "label": "Dramatic", "brightness": -10, "contrast": 35, "saturation": -15, "hue": 0, "temperature": -10, "sort_order": 7},
+]
 
 # AI operation credit costs
 CREDIT_COSTS = {
@@ -413,6 +428,26 @@ class AIService:
             select(ColorCorrection).where(ColorCorrection.id == correction_id)
         )
         return result.scalar()
+
+    @staticmethod
+    async def list_filter_presets(db: AsyncSession) -> List[FilterPreset]:
+        """List active named color-grade filter presets, seeding the
+        canonical defaults on first call if the table is empty"""
+        result = await db.execute(
+            select(FilterPreset).where(FilterPreset.is_active == True).order_by(FilterPreset.sort_order)
+        )
+        presets = list(result.scalars().all())
+        if presets:
+            return presets
+
+        for preset_data in DEFAULT_FILTER_PRESETS:
+            db.add(FilterPreset(**preset_data))
+        await db.commit()
+
+        result = await db.execute(
+            select(FilterPreset).where(FilterPreset.is_active == True).order_by(FilterPreset.sort_order)
+        )
+        return list(result.scalars().all())
 
     # ========================================================================
     # Smart Framing

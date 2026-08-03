@@ -916,6 +916,26 @@ class ColorCorrectionResponse(BaseModel):
         from_attributes = True
 
 
+class FilterPresetResponse(BaseModel):
+    """A named color-grade filter preset, applied via color correction"""
+    id: UUID
+    name: str
+    label: str
+    thumbnail_url: Optional[str] = None
+    brightness: int
+    contrast: int
+    saturation: int
+    hue: int
+    temperature: int
+
+    class Config:
+        from_attributes = True
+
+
+class FilterPresetListResponse(BaseModel):
+    presets: List[FilterPresetResponse]
+
+
 class CropSuggestion(BaseModel):
     """Crop suggestion for framing"""
     crop_x: int
