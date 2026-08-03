@@ -5,7 +5,7 @@ import {
   Loader2, Trash2, Wand2, Scissors, Volume2, VolumeX, Type, Download, Sparkles,
   Smile, ArrowUp, ArrowDown, Mic, Music,
 } from 'lucide-react';
-import { editorApi, aiApi, uploadApi, type EditorState, type Segment, type Sticker, type SoundRecommendation, type FilterPreset } from '@/lib/api';
+import { editorApi, aiApi, uploadApi, type EditorState, type Segment, type Sticker, type SoundRecommendation, type FilterPreset, type AIAgent, type AgentExecution } from '@/lib/api';
 
 interface EditPageProps {
   params: { draftId: string };
@@ -57,6 +57,7 @@ export default function EditPage({ params }: EditPageProps) {
 
   useEffect(() => {
     aiApi.getFilterPresets().then(setFilterPresets).catch(() => {});
+    aiApi.getAgents().then(setAgents).catch(() => {});
   }, []);
 
   const updateSegment = (updated: Segment) => {
@@ -163,6 +164,9 @@ export default function EditPage({ params }: EditPageProps) {
   const [aiStatus, setAiStatus] = useState<Record<string, string>>({});
   const [filterPresets, setFilterPresets] = useState<FilterPreset[]>([]);
   const [appliedFilterBySegment, setAppliedFilterBySegment] = useState<Record<string, string>>({});
+  const [agents, setAgents] = useState<AIAgent[]>([]);
+  const [runningAgentBySegment, setRunningAgentBySegment] = useState<Record<string, string>>({});
+  const [lastExecutionBySegment, setLastExecutionBySegment] = useState<Record<string, AgentExecution>>({});
   const [sounds, setSounds] = useState<SoundRecommendation[]>([]);
   const [soundsLoading, setSoundsLoading] = useState(false);
   const [soundsLoaded, setSoundsLoaded] = useState(false);
@@ -249,6 +253,30 @@ export default function EditPage({ params }: EditPageProps) {
       setAiStatus((prev) => ({ ...prev, [segmentId]: `${preset.label} filter queued` }));
     } catch {
       setAiStatus((prev) => ({ ...prev, [segmentId]: 'Failed to apply filter' }));
+    }
+  };
+
+  const handleRunAgent = async (segmentId: string, agent: AIAgent) => {
+    setRunningAgentBySegment((prev) => ({ ...prev, [segmentId]: agent.id }));
+    setAiStatus((prev) => ({ ...prev, [segmentId]: `Running ${agent.label}...` }));
+    try {
+      const execution = await aiApi.executeAgent(agent.id, segmentId);
+      setLastExecutionBySegment((prev) => ({ ...prev, [segmentId]: execution }));
+      setAiStatus((prev) => ({
+        ...prev,
+        [segmentId]:
+          execution.status === 'completed'
+            ? `${agent.label} completed (${execution.total_credits_used} credits)`
+            : `${agent.label} failed: ${execution.error_message}`,
+      }));
+    } catch {
+      setAiStatus((prev) => ({ ...prev, [segmentId]: `Failed to run ${agent.label}` }));
+    } finally {
+      setRunningAgentBySegment((prev) => {
+        const next = { ...prev };
+        delete next[segmentId];
+        return next;
+      });
     }
   };
 
@@ -518,6 +546,40 @@ export default function EditPage({ params }: EditPageProps) {
                       Voiceover
                     </button>
                   </div>
+
+                  {agents.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-800">
+                      <p className="text-xs font-semibold text-gray-500 mb-2">
+                        AI Agents — one-click recipes
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {agents.map((agent) => (
+                          <button
+                            key={agent.id}
+                            title={agent.description || undefined}
+                            onClick={() => handleRunAgent(segment.id, agent)}
+                            disabled={runningAgentBySegment[segment.id] === agent.id}
+                            className="px-3 py-1 text-xs rounded-full bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 disabled:opacity-50"
+                          >
+                            {runningAgentBySegment[segment.id] === agent.id
+                              ? `Running ${agent.label}...`
+                              : `Run ${agent.label}`}
+                          </button>
+                        ))}
+                      </div>
+                      {lastExecutionBySegment[segment.id] && (
+                        <ul className="mt-2 text-xs text-gray-500 space-y-0.5">
+                          {lastExecutionBySegment[segment.id].steps_log.map((step, i) => (
+                            <li key={i}>
+                              {step.status === 'completed' ? '✓' : '✗'} {step.operation}
+                              {step.error ? ` — ${step.error}` : ''}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  )}
+
                   {aiStatus[segment.id] && (
                     <p className="text-xs text-gray-500 mt-2">{aiStatus[segment.id]}</p>
                   )}

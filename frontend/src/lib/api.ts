@@ -463,6 +463,39 @@ export interface FilterPreset {
   temperature: number;
 }
 
+export interface AgentStep {
+  operation: string;
+  params: Record<string, unknown>;
+}
+
+export interface AIAgent {
+  id: string;
+  name: string;
+  label: string;
+  description: string | null;
+  steps: AgentStep[];
+}
+
+export interface AgentStepResult {
+  operation: string;
+  status: string;
+  credits_used: number;
+  result_id: string | null;
+  error: string | null;
+}
+
+export interface AgentExecution {
+  id: string;
+  agent_id: string;
+  segment_id: string;
+  status: 'running' | 'completed' | 'failed';
+  steps_log: AgentStepResult[];
+  total_credits_used: number;
+  error_message: string | null;
+  started_at: string;
+  completed_at: string | null;
+}
+
 export const aiApi = {
   getCredits: async () => {
     const res = await client.get<AICreditsInfo>('/api/ai/credits');
@@ -520,6 +553,23 @@ export const aiApi = {
   getFilterPresets: async () => {
     const res = await client.get<{ presets: FilterPreset[] }>('/api/ai/filters/presets');
     return res.data.presets;
+  },
+
+  getAgents: async () => {
+    const res = await client.get<{ agents: AIAgent[] }>('/api/ai/agents');
+    return res.data.agents;
+  },
+
+  executeAgent: async (agentId: string, segmentId: string) => {
+    const res = await client.post<AgentExecution>(`/api/ai/agents/${agentId}/execute`, null, {
+      params: { segment_id: segmentId },
+    });
+    return res.data;
+  },
+
+  getMyAgentExecutions: async () => {
+    const res = await client.get<{ executions: AgentExecution[] }>('/api/ai/agents/executions');
+    return res.data.executions;
   },
 
   getFrameSuggestions: async (segmentId: string, targetAspectRatio = '9:16') => {
