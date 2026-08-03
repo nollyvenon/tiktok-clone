@@ -117,6 +117,35 @@ class AuthService {
     }
   }
 
+  Future<void> changePassword(String currentPassword, String newPassword, String confirmPassword) async {
+    try {
+      await _dio.post('/api/auth/change-password', data: {
+        'current_password': currentPassword,
+        'new_password': newPassword,
+        'confirm_password': confirmPassword,
+      });
+    } on DioException catch (e) {
+      throw ApiException(_extractError(e, 'Failed to change password'));
+    }
+  }
+
+  Future<Map<String, dynamic>> exportMyData() async {
+    try {
+      final response = await _dio.get('/api/auth/me/export');
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      throw ApiException(_extractError(e, 'Failed to export data'));
+    }
+  }
+
+  Future<void> deleteAccount(String password) async {
+    try {
+      await _dio.delete('/api/auth/me', data: {'password': password});
+    } on DioException catch (e) {
+      throw ApiException(_extractError(e, 'Failed to delete account'));
+    }
+  }
+
   String _extractError(DioException e, String fallback) {
     final data = e.response?.data;
     if (data is Map && data['detail'] != null) {

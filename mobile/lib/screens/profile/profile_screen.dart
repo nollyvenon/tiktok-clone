@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import '../../models/profile.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/profile_service.dart';
-import '../settings/preferences_screen.dart';
+import '../settings/settings_screen.dart';
 import '../bookmarks/bookmarks_screen.dart';
 import '../dashboard/dashboard_screen.dart';
 import '../messages/messages_screen.dart';
@@ -160,15 +160,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
             IconButton(
-              icon: const Icon(Icons.tune),
-              tooltip: 'For You Preferences',
+              icon: const Icon(Icons.settings_outlined),
+              tooltip: 'Settings',
               onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const PreferencesScreen()),
+                MaterialPageRoute(builder: (_) => const SettingsScreen()),
               ),
-            ),
-            IconButton(
-              icon: const Icon(Icons.logout),
-              onPressed: () => context.read<AuthProvider>().logout(),
             ),
           ] else if (_profile != null)
             PopupMenuButton<String>(

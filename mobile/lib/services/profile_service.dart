@@ -94,6 +94,16 @@ class ProfileService {
     }
   }
 
+  Future<List<User>> getBlockedUsers() async {
+    try {
+      final response = await _dio.get('/api/profiles/me/blocked');
+      final items = response.data['users'] as List;
+      return items.map((e) => User.fromJson(e as Map<String, dynamic>)).toList();
+    } on DioException catch (e) {
+      throw ApiException(_extractError(e, 'Failed to load blocked users'));
+    }
+  }
+
   String _extractError(DioException e, String fallback) {
     final data = e.response?.data;
     if (data is Map && data['detail'] != null) {
