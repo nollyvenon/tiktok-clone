@@ -52,6 +52,41 @@ class SoundRecommendation {
   }
 }
 
+class FilterPreset {
+  final String id;
+  final String name;
+  final String label;
+  final int brightness;
+  final int contrast;
+  final int saturation;
+  final int hue;
+  final int temperature;
+
+  FilterPreset({
+    required this.id,
+    required this.name,
+    required this.label,
+    required this.brightness,
+    required this.contrast,
+    required this.saturation,
+    required this.hue,
+    required this.temperature,
+  });
+
+  factory FilterPreset.fromJson(Map<String, dynamic> json) {
+    return FilterPreset(
+      id: json['id'] as String,
+      name: json['name'] as String,
+      label: json['label'] as String,
+      brightness: json['brightness'] as int,
+      contrast: json['contrast'] as int,
+      saturation: json['saturation'] as int,
+      hue: json['hue'] as int,
+      temperature: json['temperature'] as int,
+    );
+  }
+}
+
 class AIService {
   final Dio _dio = ApiClient().dio;
 
@@ -87,14 +122,40 @@ class AIService {
     }
   }
 
-  Future<void> applyColorCorrection(String segmentId, {String method = 'auto_enhance'}) async {
+  Future<void> applyColorCorrection(
+    String segmentId, {
+    String method = 'auto_enhance',
+    String? presetName,
+    int? brightness,
+    int? contrast,
+    int? saturation,
+    int? hue,
+    int? temperature,
+  }) async {
     try {
       await _dio.post('/api/ai/color-correction', data: {
         'segment_id': segmentId,
         'method': method,
+        if (presetName != null) 'preset_name': presetName,
+        if (brightness != null) 'brightness': brightness,
+        if (contrast != null) 'contrast': contrast,
+        if (saturation != null) 'saturation': saturation,
+        if (hue != null) 'hue': hue,
+        if (temperature != null) 'temperature': temperature,
       });
     } on DioException catch (e) {
       throw ApiException(_extractError(e, 'Color correction failed'));
+    }
+  }
+
+  Future<List<FilterPreset>> getFilterPresets() async {
+    try {
+      final response = await _dio.get('/api/ai/filters/presets');
+      return (response.data['presets'] as List)
+          .map((e) => FilterPreset.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } on DioException catch (e) {
+      throw ApiException(_extractError(e, 'Failed to load filter presets'));
     }
   }
 

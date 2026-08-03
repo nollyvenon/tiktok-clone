@@ -37,11 +37,16 @@ class _EditorScreenState extends State<EditorScreen> {
   bool _soundsLoading = false;
   bool _soundsLoaded = false;
   String? _selectedSoundId;
+  List<FilterPreset> _filterPresets = [];
+  final Map<String, String> _appliedFilterBySegment = {};
 
   @override
   void initState() {
     super.initState();
     _load();
+    _aiService.getFilterPresets().then((presets) {
+      if (mounted) setState(() => _filterPresets = presets);
+    }).catchError((_) {});
   }
 
   Future<void> _load() async {
@@ -271,6 +276,28 @@ class _EditorScreenState extends State<EditorScreen> {
     }
   }
 
+  Future<void> _applyFilterPreset(EditorSegment segment, FilterPreset preset) async {
+    setState(() => _aiStatus[segment.id] = 'Applying ${preset.label}...');
+    try {
+      await _aiService.applyColorCorrection(
+        segment.id,
+        method: 'preset',
+        presetName: preset.name,
+        brightness: preset.brightness,
+        contrast: preset.contrast,
+        saturation: preset.saturation,
+        hue: preset.hue,
+        temperature: preset.temperature,
+      );
+      setState(() {
+        _appliedFilterBySegment[segment.id] = preset.name;
+        _aiStatus[segment.id] = '${preset.label} filter queued';
+      });
+    } catch (e) {
+      setState(() => _aiStatus[segment.id] = e.toString());
+    }
+  }
+
   Future<void> _colorCorrect(EditorSegment segment) async {
     setState(() => _aiStatus[segment.id] = 'Applying auto color correction...');
     try {
@@ -425,6 +452,47 @@ class _EditorScreenState extends State<EditorScreen> {
                                 '${segment.startTime}ms - ${segment.endTime}ms',
                                 style: Theme.of(context).textTheme.bodySmall,
                               ),
+                              if (_filterPresets.isNotEmpty) ...[
+                                const Divider(),
+                                const Text('Filters', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                const SizedBox(height: 4),
+                                SizedBox(
+                                  height: 64,
+                                  child: ListView(
+                                    scrollDirection: Axis.horizontal,
+                                    children: _filterPresets.map((preset) {
+                                      final isApplied = _appliedFilterBySegment[segment.id] == preset.name;
+                                      return Padding(
+                                        padding: const EdgeInsets.only(right: 8),
+                                        child: GestureDetector(
+                                          onTap: () => _applyFilterPreset(segment, preset),
+                                          child: Column(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Container(
+                                                width: 32,
+                                                height: 32,
+                                                decoration: BoxDecoration(
+                                                  shape: BoxShape.circle,
+                                                  gradient: const LinearGradient(
+                                                    colors: [Colors.pink, Colors.purple],
+                                                  ),
+                                                  border: Border.all(
+                                                    color: isApplied ? Colors.pink : Colors.transparent,
+                                                    width: 2,
+                                                  ),
+                                                ),
+                                              ),
+                                              const SizedBox(height: 2),
+                                              Text(preset.label, style: const TextStyle(fontSize: 10)),
+                                            ],
+                                          ),
+                                        ),
+                                      );
+                                    }).toList(),
+                                  ),
+                                ),
+                              ],
                               const Divider(),
                               const Row(
                                 children: [
