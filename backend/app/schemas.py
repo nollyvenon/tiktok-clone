@@ -9,7 +9,7 @@ from uuid import UUID
 
 from app.models import (
     UserRole, RemixType, ReportedContentType, ReportReason, ReportStatus, ModerationActionType,
-    ApplicationStatus,
+    ApplicationStatus, CollaborationStatus, CollaboratorStatus,
 )
 
 
@@ -1489,6 +1489,66 @@ class ApplicationDecisionRequest(BaseModel):
         if v == ApplicationStatus.PENDING:
             raise ValueError("Decision status must be 'approved' or 'rejected'")
         return v
+
+
+# ============================================================================
+# Collaboration Schemas
+# ============================================================================
+
+class CollaboratorSplit(BaseModel):
+    """One participant's revenue share when creating a collaboration"""
+    user_id: UUID
+    revenue_split_percent: float = Field(..., gt=0, le=100)
+
+
+class CollaborationCreate(BaseModel):
+    """Create a collaboration on one of your own videos"""
+    video_id: UUID
+    title: Optional[str] = Field(None, max_length=255)
+    collaborators: List[CollaboratorSplit] = Field(..., min_length=1)
+
+    @field_validator("collaborators")
+    @classmethod
+    def validate_splits(cls, v):
+        user_ids = [c.user_id for c in v]
+        if len(user_ids) != len(set(user_ids)):
+            raise ValueError("Each collaborator can only appear once")
+        total = sum(c.revenue_split_percent for c in v)
+        if abs(total - 100.0) > 0.01:
+            raise ValueError("Revenue splits must sum to exactly 100")
+        return v
+
+
+class CollaboratorResponse(BaseModel):
+    """A single collaborator's participation on a collaboration"""
+    id: UUID
+    user_id: UUID
+    revenue_split_percent: float
+    is_initiator: bool
+    status: CollaboratorStatus
+    responded_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class CollaborationResponse(BaseModel):
+    """A team content-creation collaboration"""
+    id: UUID
+    video_id: UUID
+    initiator_id: UUID
+    title: Optional[str] = None
+    status: CollaborationStatus
+    collaborators: List[CollaboratorResponse]
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class CollaborationRespondRequest(BaseModel):
+    """Accept or decline an invitation to collaborate"""
+    accept: bool
 
 
 # ============================================================================

@@ -1355,3 +1355,68 @@ class CreatorApplication(Base):
     __table_args__ = (
         UniqueConstraint('program_id', 'user_id', name='unique_program_applicant'),
     )
+
+
+# ============================================================================
+# MODULE 29: COLLABORATIONS
+# ============================================================================
+
+class CollaborationStatus(str, enum.Enum):
+    """Status of a team-content collaboration as a whole"""
+    PENDING = "pending"    # Waiting on one or more invited collaborators
+    ACTIVE = "active"      # Every collaborator has accepted
+    CANCELLED = "cancelled"
+
+
+class CollaboratorStatus(str, enum.Enum):
+    """Status of a single collaborator's participation"""
+    INVITED = "invited"
+    ACCEPTED = "accepted"
+    DECLINED = "declined"
+
+
+class Collaboration(Base):
+    """A team content-creation collaboration on a single video, with a
+    revenue split agreed upfront among all collaborators"""
+    __tablename__ = "collaborations"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    video_id = Column(UUID(as_uuid=True), ForeignKey("videos.id", ondelete="CASCADE"), nullable=False, index=True)
+    initiator_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    title = Column(String(255), nullable=True)
+
+    status = Column(
+        Enum(CollaborationStatus, values_callable=lambda e: [x.value for x in e]),
+        default=CollaborationStatus.PENDING, nullable=False, index=True,
+    )
+
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    collaborators = relationship("Collaborator", cascade="all, delete-orphan")
+
+
+class Collaborator(Base):
+    """A single collaborator's revenue share and response on a
+    collaboration - the initiator is included as a row with is_initiator
+    set and starts pre-accepted, so the split always accounts for 100%
+    of participants regardless of who invited whom."""
+    __tablename__ = "collaborators"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    collaboration_id = Column(UUID(as_uuid=True), ForeignKey("collaborations.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    revenue_split_percent = Column(Float, nullable=False)
+    is_initiator = Column(Boolean, default=False, nullable=False)
+    status = Column(
+        Enum(CollaboratorStatus, values_callable=lambda e: [x.value for x in e]),
+        default=CollaboratorStatus.INVITED, nullable=False, index=True,
+    )
+
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    responded_at = Column(DateTime, nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint('collaboration_id', 'user_id', name='unique_collaboration_participant'),
+    )
