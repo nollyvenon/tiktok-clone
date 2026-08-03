@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import (
     FundingProgram, CreatorApplication, ApplicationStatus, Follow, Video, VideoStatus,
+    Earning, EarningSourceType,
 )
 
 logger = logging.getLogger(__name__)
@@ -158,6 +159,12 @@ class CreatorFundService:
         if decision == ApplicationStatus.APPROVED:
             program = await db.get(FundingProgram, application.program_id)
             application.awarded_amount = program.award_amount
+            db.add(Earning(
+                user_id=application.user_id,
+                source_type=EarningSourceType.CREATOR_FUND,
+                fund_application_id=application.id,
+                amount=program.award_amount,
+            ))
 
         await db.commit()
         await db.refresh(application)

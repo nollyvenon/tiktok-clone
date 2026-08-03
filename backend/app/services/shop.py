@@ -15,7 +15,7 @@ from datetime import datetime
 from sqlalchemy import select, and_, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Shop, ShopProduct, ShopOrder, ShopOrderStatus
+from app.models import Shop, ShopProduct, ShopOrder, ShopOrderStatus, Earning, EarningSourceType
 
 logger = logging.getLogger(__name__)
 
@@ -179,6 +179,12 @@ class ShopService:
 
         order.status = ShopOrderStatus.FULFILLED
         order.fulfilled_at = datetime.utcnow()
+        db.add(Earning(
+            user_id=user_id,
+            source_type=EarningSourceType.SHOP_ORDER,
+            shop_order_id=order.id,
+            amount=order.total_amount,
+        ))
         await db.commit()
         await db.refresh(order)
         return order

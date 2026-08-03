@@ -1575,3 +1575,73 @@ class ShopOrder(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
     fulfilled_at = Column(DateTime, nullable=True)
     cancelled_at = Column(DateTime, nullable=True)
+
+
+# ============================================================================
+# MODULE 18: MONETIZATION
+# ============================================================================
+
+class EarningSourceType(str, enum.Enum):
+    """Where a credited earning came from"""
+    CREATOR_FUND = "creator_fund"
+    SHOP_ORDER = "shop_order"
+
+
+class Earning(Base):
+    """A credited earning on a creator's ledger, recorded automatically
+    when a Creator Fund application is approved or a shop order is
+    fulfilled. This is a ledger entry only - no real payment processor
+    exists anywhere in this app, so nothing here means money actually
+    moved; it's the internal record of what a creator is owed."""
+    __tablename__ = "earnings"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    source_type = Column(
+        Enum(EarningSourceType, values_callable=lambda e: [x.value for x in e]),
+        nullable=False, index=True,
+    )
+    fund_application_id = Column(UUID(as_uuid=True), ForeignKey("creator_applications.id", ondelete="SET NULL"), nullable=True)
+    shop_order_id = Column(UUID(as_uuid=True), ForeignKey("shop_orders.id", ondelete="SET NULL"), nullable=True)
+
+    amount = Column(Integer, nullable=False)  # Cents
+
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+
+    __table_args__ = (
+        CheckConstraint(
+            "(source_type = 'creator_fund' AND fund_application_id IS NOT NULL AND shop_order_id IS NULL) OR "
+            "(source_type = 'shop_order' AND shop_order_id IS NOT NULL AND fund_application_id IS NULL)",
+            name="ck_earning_single_source",
+        ),
+    )
+
+
+class PayoutStatus(str, enum.Enum):
+    """Status of a creator's payout request"""
+    PENDING = "pending"
+    COMPLETED = "completed"
+    CANCELLED = "cancelled"
+
+
+class Payout(Base):
+    """A creator's request to withdraw from their earned balance.
+    'completed' means an admin marked it paid out through whatever
+    real-world process is used outside this app - there is no payment
+    processor integration to do this automatically."""
+    __tablename__ = "payouts"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    amount = Column(Integer, nullable=False)  # Cents
+
+    status = Column(
+        Enum(PayoutStatus, values_callable=lambda e: [x.value for x in e]),
+        default=PayoutStatus.PENDING, nullable=False, index=True,
+    )
+    decided_by = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    notes = Column(Text, nullable=True)
+
+    requested_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    decided_at = Column(DateTime, nullable=True)

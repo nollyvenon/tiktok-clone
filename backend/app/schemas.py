@@ -10,6 +10,7 @@ from uuid import UUID
 from app.models import (
     UserRole, RemixType, ReportedContentType, ReportReason, ReportStatus, ModerationActionType,
     ApplicationStatus, CollaborationStatus, CollaboratorStatus, AgentExecutionStatus, ShopOrderStatus,
+    EarningSourceType, PayoutStatus,
 )
 
 
@@ -1063,6 +1064,66 @@ class ShopOrderResponse(BaseModel):
 
 class ShopOrderListResponse(BaseModel):
     orders: List[ShopOrderResponse]
+
+
+# ============================================================================
+# Monetization Schemas
+# ============================================================================
+
+class EarningResponse(BaseModel):
+    id: UUID
+    source_type: EarningSourceType
+    fund_application_id: Optional[UUID] = None
+    shop_order_id: Optional[UUID] = None
+    amount: int
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class PayoutRequest(BaseModel):
+    amount: int = Field(..., gt=0, description="Cents")
+
+
+class PayoutResponse(BaseModel):
+    id: UUID
+    user_id: UUID
+    amount: int
+    status: PayoutStatus
+    notes: Optional[str] = None
+    requested_at: datetime
+    decided_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class PayoutListResponse(BaseModel):
+    payouts: List[PayoutResponse]
+    total: int
+    limit: int
+    offset: int
+
+
+class PayoutDecisionRequest(BaseModel):
+    status: PayoutStatus
+    notes: Optional[str] = Field(None, max_length=1000)
+
+    @field_validator("status")
+    @classmethod
+    def validate_status(cls, v):
+        if v == PayoutStatus.PENDING:
+            raise ValueError("Decision status must be 'completed' or 'cancelled'")
+        return v
+
+
+class EarningsSummaryResponse(BaseModel):
+    total_earned: int
+    total_paid_out: int
+    pending_payout_total: int
+    available_balance: int
+    earnings: List[EarningResponse]
 
 
 class CropSuggestion(BaseModel):
