@@ -39,6 +39,9 @@ class _EditorScreenState extends State<EditorScreen> {
   String? _selectedSoundId;
   List<FilterPreset> _filterPresets = [];
   final Map<String, String> _appliedFilterBySegment = {};
+  List<AIAgent> _agents = [];
+  final Map<String, String> _runningAgentBySegment = {};
+  final Map<String, AgentExecution> _lastExecutionBySegment = {};
 
   @override
   void initState() {
@@ -46,6 +49,9 @@ class _EditorScreenState extends State<EditorScreen> {
     _load();
     _aiService.getFilterPresets().then((presets) {
       if (mounted) setState(() => _filterPresets = presets);
+    }).catchError((_) {});
+    _aiService.getAgents().then((agents) {
+      if (mounted) setState(() => _agents = agents);
     }).catchError((_) {});
   }
 
@@ -298,6 +304,26 @@ class _EditorScreenState extends State<EditorScreen> {
     }
   }
 
+  Future<void> _runAgent(EditorSegment segment, AIAgent agent) async {
+    setState(() {
+      _runningAgentBySegment[segment.id] = agent.id;
+      _aiStatus[segment.id] = 'Running ${agent.label}...';
+    });
+    try {
+      final execution = await _aiService.executeAgent(agent.id, segment.id);
+      setState(() {
+        _lastExecutionBySegment[segment.id] = execution;
+        _aiStatus[segment.id] = execution.status == 'completed'
+            ? '${agent.label} completed (${execution.totalCreditsUsed} credits)'
+            : '${agent.label} failed: ${execution.errorMessage}';
+      });
+    } catch (e) {
+      setState(() => _aiStatus[segment.id] = 'Failed to run ${agent.label}');
+    } finally {
+      setState(() => _runningAgentBySegment.remove(segment.id));
+    }
+  }
+
   Future<void> _colorCorrect(EditorSegment segment) async {
     setState(() => _aiStatus[segment.id] = 'Applying auto color correction...');
     try {
@@ -528,6 +554,39 @@ class _EditorScreenState extends State<EditorScreen> {
                                   ),
                                 ],
                               ),
+                              if (_agents.isNotEmpty) ...[
+                                const SizedBox(height: 8),
+                                const Text(
+                                  'AI Agents — one-click recipes',
+                                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey),
+                                ),
+                                const SizedBox(height: 4),
+                                Wrap(
+                                  spacing: 8,
+                                  children: _agents.map((agent) {
+                                    final isRunning = _runningAgentBySegment[segment.id] == agent.id;
+                                    return ActionChip(
+                                      backgroundColor: Colors.indigo.shade50,
+                                      label: Text(isRunning ? 'Running ${agent.label}...' : 'Run ${agent.label}'),
+                                      onPressed: isRunning ? null : () => _runAgent(segment, agent),
+                                    );
+                                  }).toList(),
+                                ),
+                                if (_lastExecutionBySegment[segment.id] != null)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 4),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: _lastExecutionBySegment[segment.id]!
+                                          .stepsLog
+                                          .map((step) => Text(
+                                                '${step.status == 'completed' ? '✓' : '✗'} ${step.operation}${step.error != null ? ' — ${step.error}' : ''}',
+                                                style: const TextStyle(fontSize: 11, color: Colors.grey),
+                                              ))
+                                          .toList(),
+                                    ),
+                                  ),
+                              ],
                               if (_aiStatus[segment.id] != null)
                                 Padding(
                                   padding: const EdgeInsets.only(top: 4),

@@ -87,6 +87,73 @@ class FilterPreset {
   }
 }
 
+class AIAgent {
+  final String id;
+  final String name;
+  final String label;
+  final String? description;
+
+  AIAgent({required this.id, required this.name, required this.label, this.description});
+
+  factory AIAgent.fromJson(Map<String, dynamic> json) {
+    return AIAgent(
+      id: json['id'] as String,
+      name: json['name'] as String,
+      label: json['label'] as String,
+      description: json['description'] as String?,
+    );
+  }
+}
+
+class AgentStepResult {
+  final String operation;
+  final String status;
+  final int creditsUsed;
+  final String? error;
+
+  AgentStepResult({required this.operation, required this.status, required this.creditsUsed, this.error});
+
+  factory AgentStepResult.fromJson(Map<String, dynamic> json) {
+    return AgentStepResult(
+      operation: json['operation'] as String,
+      status: json['status'] as String,
+      creditsUsed: json['credits_used'] as int? ?? 0,
+      error: json['error'] as String?,
+    );
+  }
+}
+
+class AgentExecution {
+  final String id;
+  final String agentId;
+  final String status;
+  final List<AgentStepResult> stepsLog;
+  final int totalCreditsUsed;
+  final String? errorMessage;
+
+  AgentExecution({
+    required this.id,
+    required this.agentId,
+    required this.status,
+    required this.stepsLog,
+    required this.totalCreditsUsed,
+    this.errorMessage,
+  });
+
+  factory AgentExecution.fromJson(Map<String, dynamic> json) {
+    return AgentExecution(
+      id: json['id'] as String,
+      agentId: json['agent_id'] as String,
+      status: json['status'] as String,
+      stepsLog: (json['steps_log'] as List)
+          .map((e) => AgentStepResult.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      totalCreditsUsed: json['total_credits_used'] as int,
+      errorMessage: json['error_message'] as String?,
+    );
+  }
+}
+
 class AIService {
   final Dio _dio = ApiClient().dio;
 
@@ -156,6 +223,29 @@ class AIService {
           .toList();
     } on DioException catch (e) {
       throw ApiException(_extractError(e, 'Failed to load filter presets'));
+    }
+  }
+
+  Future<List<AIAgent>> getAgents() async {
+    try {
+      final response = await _dio.get('/api/ai/agents');
+      return (response.data['agents'] as List)
+          .map((e) => AIAgent.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } on DioException catch (e) {
+      throw ApiException(_extractError(e, 'Failed to load AI agents'));
+    }
+  }
+
+  Future<AgentExecution> executeAgent(String agentId, String segmentId) async {
+    try {
+      final response = await _dio.post(
+        '/api/ai/agents/$agentId/execute',
+        queryParameters: {'segment_id': segmentId},
+      );
+      return AgentExecution.fromJson(response.data);
+    } on DioException catch (e) {
+      throw ApiException(_extractError(e, 'Failed to run agent'));
     }
   }
 
