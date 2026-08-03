@@ -3,7 +3,7 @@
 import { useQuery } from 'react-query';
 import Link from 'next/link';
 import { videoApi } from '@/lib/api';
-import { Loader2, AlertCircle, Eye, Heart, MessageCircle, Users, BarChart3, DollarSign } from 'lucide-react';
+import { Loader2, AlertCircle, Eye, Heart, MessageCircle, Users, BarChart3, DollarSign, Handshake } from 'lucide-react';
 
 function StatCard({ label, value, icon: Icon }: { label: string; value: string | number; icon: typeof Eye }) {
   return (
@@ -49,13 +49,22 @@ export default function DashboardPage() {
             <BarChart3 className="w-7 h-7 text-pink-600" />
             Creator Dashboard
           </h1>
-          <Link
-            href="/creator-fund"
-            className="flex items-center gap-1.5 text-sm font-semibold text-pink-600 hover:text-pink-700"
-          >
-            <DollarSign className="w-4 h-4" />
-            Creator Fund
-          </Link>
+          <div className="flex items-center gap-4">
+            <Link
+              href="/creator-fund"
+              className="flex items-center gap-1.5 text-sm font-semibold text-pink-600 hover:text-pink-700"
+            >
+              <DollarSign className="w-4 h-4" />
+              Creator Fund
+            </Link>
+            <Link
+              href="/collaborations"
+              className="flex items-center gap-1.5 text-sm font-semibold text-pink-600 hover:text-pink-700"
+            >
+              <Handshake className="w-4 h-4" />
+              Collaborations
+            </Link>
+          </div>
         </div>
         <p className="text-gray-500 text-sm mb-8">
           Aggregate performance across all {data.video_count} of your videos

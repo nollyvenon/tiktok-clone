@@ -1242,6 +1242,56 @@ export const creatorFundApi = {
   },
 };
 
+export interface CollaboratorSplit {
+  id: string;
+  user_id: string;
+  revenue_split_percent: number;
+  is_initiator: boolean;
+  status: 'invited' | 'accepted' | 'declined';
+  responded_at: string | null;
+}
+
+export interface Collaboration {
+  id: string;
+  video_id: string;
+  initiator_id: string;
+  title: string | null;
+  status: 'pending' | 'active' | 'cancelled';
+  collaborators: CollaboratorSplit[];
+  created_at: string;
+}
+
+export const collaborationsApi = {
+  create: async (data: {
+    video_id: string;
+    title?: string;
+    collaborators: { user_id: string; revenue_split_percent: number }[];
+  }) => {
+    const res = await client.post<Collaboration>('/api/collaborations', data);
+    return res.data;
+  },
+
+  listMine: async () => {
+    const res = await client.get<Collaboration[]>('/api/collaborations/me');
+    return res.data;
+  },
+
+  get: async (collaborationId: string) => {
+    const res = await client.get<Collaboration>(`/api/collaborations/${collaborationId}`);
+    return res.data;
+  },
+
+  respond: async (collaborationId: string, accept: boolean) => {
+    const res = await client.post<Collaboration>(`/api/collaborations/${collaborationId}/respond`, { accept });
+    return res.data;
+  },
+
+  cancel: async (collaborationId: string) => {
+    const res = await client.post<Collaboration>(`/api/collaborations/${collaborationId}/cancel`);
+    return res.data;
+  },
+};
+
 export const adminApi = {
   getStats: async () => {
     const res = await client.get<AdminStats>('/api/admin/stats');
