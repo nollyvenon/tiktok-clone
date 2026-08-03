@@ -9,7 +9,7 @@ from uuid import UUID
 
 from app.models import (
     UserRole, RemixType, ReportedContentType, ReportReason, ReportStatus, ModerationActionType,
-    ApplicationStatus, CollaborationStatus, CollaboratorStatus, AgentExecutionStatus,
+    ApplicationStatus, CollaborationStatus, CollaboratorStatus, AgentExecutionStatus, ShopOrderStatus,
 )
 
 
@@ -980,6 +980,89 @@ class AgentExecutionResponse(BaseModel):
 
 class AgentExecutionListResponse(BaseModel):
     executions: List[AgentExecutionResponse]
+
+
+# ============================================================================
+# Creator Shop Schemas
+# ============================================================================
+
+class ShopUpsertRequest(BaseModel):
+    """Create or update your own shop"""
+    name: str = Field(..., max_length=255)
+    description: Optional[str] = None
+
+
+class ShopResponse(BaseModel):
+    id: UUID
+    user_id: UUID
+    name: str
+    description: Optional[str] = None
+    is_active: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class ShopProductCreate(BaseModel):
+    name: str = Field(..., max_length=255)
+    description: Optional[str] = None
+    price: int = Field(..., gt=0, description="Cents")
+    image_url: Optional[str] = None
+    stock_quantity: Optional[int] = Field(None, ge=0, description="Null = unlimited")
+
+
+class ShopProductUpdate(BaseModel):
+    name: Optional[str] = Field(None, max_length=255)
+    description: Optional[str] = None
+    price: Optional[int] = Field(None, gt=0)
+    image_url: Optional[str] = None
+    stock_quantity: Optional[int] = Field(None, ge=0)
+    is_active: Optional[bool] = None
+
+
+class ShopProductResponse(BaseModel):
+    id: UUID
+    shop_id: UUID
+    name: str
+    description: Optional[str] = None
+    price: int
+    image_url: Optional[str] = None
+    stock_quantity: Optional[int] = None
+    is_active: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class ShopWithProductsResponse(BaseModel):
+    shop: ShopResponse
+    products: List[ShopProductResponse]
+
+
+class ShopOrderCreate(BaseModel):
+    quantity: int = Field(1, ge=1)
+
+
+class ShopOrderResponse(BaseModel):
+    id: UUID
+    product_id: UUID
+    shop_id: UUID
+    buyer_id: UUID
+    quantity: int
+    total_amount: int
+    status: ShopOrderStatus
+    created_at: datetime
+    fulfilled_at: Optional[datetime] = None
+    cancelled_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class ShopOrderListResponse(BaseModel):
+    orders: List[ShopOrderResponse]
 
 
 class CropSuggestion(BaseModel):

@@ -1503,3 +1503,75 @@ class AgentExecution(Base):
 
     started_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
     completed_at = Column(DateTime, nullable=True)
+
+
+# ============================================================================
+# MODULE 16: CREATOR SHOP
+# ============================================================================
+
+class Shop(Base):
+    """A creator's storefront - one per user. Orders placed against it
+    are recorded transactions only; no real payment processor exists
+    anywhere in this app (consistent with Creator Fund and
+    Collaborations), so 'paid' means the seller/buyer confirmed the deal,
+    not that money actually moved via Stripe or similar."""
+    __tablename__ = "shops"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True, index=True)
+    name = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+    is_active = Column(Boolean, default=True, nullable=False)
+
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+
+class ShopProduct(Base):
+    """A product listed in a creator's shop"""
+    __tablename__ = "shop_products"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    shop_id = Column(UUID(as_uuid=True), ForeignKey("shops.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    name = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+    price = Column(Integer, nullable=False)  # Cents
+    image_url = Column(String(500), nullable=True)
+    stock_quantity = Column(Integer, nullable=True)  # Null = unlimited stock
+    is_active = Column(Boolean, default=True, nullable=False)
+
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    deleted_at = Column(DateTime, nullable=True)
+
+
+class ShopOrderStatus(str, enum.Enum):
+    """Status of a shop order"""
+    PENDING = "pending"
+    FULFILLED = "fulfilled"
+    CANCELLED = "cancelled"
+
+
+class ShopOrder(Base):
+    """A buyer's order for a product - a recorded transaction, not a
+    real payment. total_amount is a snapshot of price*quantity at order
+    time, so later price changes don't retroactively alter it."""
+    __tablename__ = "shop_orders"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    product_id = Column(UUID(as_uuid=True), ForeignKey("shop_products.id", ondelete="CASCADE"), nullable=False, index=True)
+    shop_id = Column(UUID(as_uuid=True), ForeignKey("shops.id", ondelete="CASCADE"), nullable=False, index=True)
+    buyer_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    quantity = Column(Integer, nullable=False)
+    total_amount = Column(Integer, nullable=False)  # Cents
+
+    status = Column(
+        Enum(ShopOrderStatus, values_callable=lambda e: [x.value for x in e]),
+        default=ShopOrderStatus.PENDING, nullable=False, index=True,
+    )
+
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    fulfilled_at = Column(DateTime, nullable=True)
+    cancelled_at = Column(DateTime, nullable=True)
