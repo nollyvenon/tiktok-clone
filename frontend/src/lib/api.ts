@@ -1361,6 +1361,114 @@ export const collaborationsApi = {
   },
 };
 
+export interface Shop {
+  id: string;
+  user_id: string;
+  name: string;
+  description: string | null;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface ShopProduct {
+  id: string;
+  shop_id: string;
+  name: string;
+  description: string | null;
+  price: number;
+  image_url: string | null;
+  stock_quantity: number | null;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface ShopOrder {
+  id: string;
+  product_id: string;
+  shop_id: string;
+  buyer_id: string;
+  quantity: number;
+  total_amount: number;
+  status: 'pending' | 'fulfilled' | 'cancelled';
+  created_at: string;
+  fulfilled_at: string | null;
+  cancelled_at: string | null;
+}
+
+export const shopApi = {
+  upsertMyShop: async (name: string, description?: string) => {
+    const res = await client.post<Shop>('/api/shop/me', { name, description });
+    return res.data;
+  },
+
+  getMyShop: async () => {
+    const res = await client.get<Shop>('/api/shop/me');
+    return res.data;
+  },
+
+  getShop: async (shopId: string) => {
+    const res = await client.get<{ shop: Shop; products: ShopProduct[] }>(`/api/shop/${shopId}`);
+    return res.data;
+  },
+
+  getShopByUser: async (userId: string) => {
+    const res = await client.get<{ shop: Shop; products: ShopProduct[] }>(`/api/shop/user/${userId}`);
+    return res.data;
+  },
+
+  createProduct: async (data: {
+    name: string;
+    description?: string;
+    price: number;
+    image_url?: string;
+    stock_quantity?: number | null;
+  }) => {
+    const res = await client.post<ShopProduct>('/api/shop/products', data);
+    return res.data;
+  },
+
+  updateProduct: async (productId: string, data: Partial<{
+    name: string;
+    description: string;
+    price: number;
+    image_url: string;
+    stock_quantity: number | null;
+    is_active: boolean;
+  }>) => {
+    const res = await client.put<ShopProduct>(`/api/shop/products/${productId}`, data);
+    return res.data;
+  },
+
+  deleteProduct: async (productId: string) => {
+    await client.delete(`/api/shop/products/${productId}`);
+  },
+
+  orderProduct: async (productId: string, quantity = 1) => {
+    const res = await client.post<ShopOrder>(`/api/shop/products/${productId}/order`, { quantity });
+    return res.data;
+  },
+
+  getMyOrders: async () => {
+    const res = await client.get<{ orders: ShopOrder[] }>('/api/shop/orders/me');
+    return res.data.orders;
+  },
+
+  getReceivedOrders: async () => {
+    const res = await client.get<{ orders: ShopOrder[] }>('/api/shop/orders/received');
+    return res.data.orders;
+  },
+
+  fulfillOrder: async (orderId: string) => {
+    const res = await client.post<ShopOrder>(`/api/shop/orders/${orderId}/fulfill`);
+    return res.data;
+  },
+
+  cancelOrder: async (orderId: string) => {
+    const res = await client.post<ShopOrder>(`/api/shop/orders/${orderId}/cancel`);
+    return res.data;
+  },
+};
+
 export const adminApi = {
   getStats: async () => {
     const res = await client.get<AdminStats>('/api/admin/stats');

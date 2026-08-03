@@ -4,9 +4,9 @@ import { useState } from 'react';
 import { useQuery, useMutation } from 'react-query';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { profileApi, videoApi, messageApi } from '@/lib/api';
+import { profileApi, videoApi, messageApi, shopApi } from '@/lib/api';
 import { VideoCard } from '@/components/features/VideoCard';
-import { Loader2, AlertCircle, MessageCircle, SlidersHorizontal, MoreVertical, Ban, Flag } from 'lucide-react';
+import { Loader2, AlertCircle, MessageCircle, SlidersHorizontal, MoreVertical, Ban, Flag, Store } from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
 import ReportModal from '@/components/features/ReportModal';
 
@@ -46,6 +46,12 @@ export default function ProfilePage({ params }: ProfilePageProps) {
       refetchProfile();
     },
   });
+
+  const { data: shopData } = useQuery(
+    ['profile-shop', params.id],
+    () => shopApi.getShopByUser(params.id),
+    { enabled: !!profile, retry: false }
+  );
 
   if (profileLoading) {
     return (
@@ -112,6 +118,15 @@ export default function ProfilePage({ params }: ProfilePageProps) {
 
           {!isOwnProfile && (
             <div className="flex gap-2 relative">
+              {shopData && (
+                <Link
+                  href={`/shop/${shopData.shop.id}`}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-full border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 font-semibold text-sm"
+                >
+                  <Store className="w-4 h-4" />
+                  Shop
+                </Link>
+              )}
               <button
                 onClick={() => followMutation.mutate()}
                 disabled={followMutation.isLoading || isBlocked}

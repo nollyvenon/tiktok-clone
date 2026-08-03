@@ -24,6 +24,7 @@ import {
   Bookmark,
   BarChart3,
   Settings,
+  Receipt,
 } from 'lucide-react';
 
 export function Navbar() {
@@ -169,6 +170,13 @@ export function Navbar() {
                   <span>Dashboard</span>
                 </Link>
                 <Link
+                  href="/shop/orders"
+                  className="flex items-center gap-2 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700"
+                >
+                  <Receipt className="w-4 h-4" />
+                  <span>My Orders</span>
+                </Link>
+                <Link
                   href="/settings/account"
                   className="flex items-center gap-2 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700"
                 >
@@ -245,6 +253,13 @@ export function Navbar() {
             >
               <BarChart3 className="w-5 h-5" />
               <span>Dashboard</span>
+            </Link>
+            <Link
+              href="/shop/orders"
+              className="flex items-center gap-2 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded"
+            >
+              <Receipt className="w-5 h-5" />
+              <span>My Orders</span>
             </Link>
             <Link
               href="/settings/account"
