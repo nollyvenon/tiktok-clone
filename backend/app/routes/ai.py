@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
 from uuid import UUID
 import logging
+import json
 
 from app.database import get_db
 from app.schemas import (
@@ -19,8 +20,10 @@ from app.schemas import (
     AIGenerationResponse, AICreditsResponse, AIOperationHistoryResponse,
     ErrorResponse, FeedResponse, VideoDetailResponse, UserPublicProfile, MusicPreview,
     FilterPresetListResponse, FilterPresetResponse,
+    AIAgentListResponse, AIAgentResponse, AgentExecutionResponse, AgentExecutionListResponse,
 )
 from app.services.ai import AIService
+from app.services.ai_agents import AIAgentService
 from app.services.uploads import UploadService
 from app.services.videos import VideoService
 from app.services.profiles import ProfileService
@@ -883,3 +886,80 @@ async def get_ai_operation_history(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to retrieve AI history",
         )
+
+
+# ============================================================================
+# AI Agents
+# ============================================================================
+
+@router.get("/agents", response_model=AIAgentListResponse)
+async def list_agents(db: AsyncSession = Depends(get_db)):
+    """List available AI agents - named recipes that chain existing AI
+    Creator Studio operations into a single one-click run"""
+    agents = await AIAgentService.list_agents(db)
+    return AIAgentListResponse(agents=[AIAgentResponse(**a) for a in agents])
+
+
+@router.post(
+    "/agents/{agent_id}/execute",
+    response_model=AgentExecutionResponse,
+    responses={
+        400: {"model": ErrorResponse, "description": "Agent or segment not found"},
+        403: {"model": ErrorResponse, "description": "Not authorized"},
+    },
+)
+async def execute_agent(
+    agent_id: UUID,
+    segment_id: UUID = Query(...),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Run an agent's full step sequence against a segment"""
+    result = await db.execute(select(Segment).where(Segment.id == segment_id))
+    segment = result.scalar()
+    if not segment:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Segment not found")
+
+    draft = await UploadService.get_draft(db, segment.draft_id)
+    if not draft or draft.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
+
+    try:
+        execution = await AIAgentService.execute_agent(db, current_user.id, agent_id, segment_id)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+    return AgentExecutionResponse(
+        id=execution.id,
+        agent_id=execution.agent_id,
+        segment_id=execution.segment_id,
+        status=execution.status,
+        steps_log=json.loads(execution.steps_log) if execution.steps_log else [],
+        total_credits_used=execution.total_credits_used,
+        error_message=execution.error_message,
+        started_at=execution.started_at,
+        completed_at=execution.completed_at,
+    )
+
+
+@router.get("/agents/executions", response_model=AgentExecutionListResponse)
+async def list_my_agent_executions(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """List your own past agent executions, newest first"""
+    executions = await AIAgentService.list_my_executions(db, current_user.id)
+    return AgentExecutionListResponse(executions=[
+        AgentExecutionResponse(
+            id=e.id,
+            agent_id=e.agent_id,
+            segment_id=e.segment_id,
+            status=e.status,
+            steps_log=json.loads(e.steps_log) if e.steps_log else [],
+            total_credits_used=e.total_credits_used,
+            error_message=e.error_message,
+            started_at=e.started_at,
+            completed_at=e.completed_at,
+        )
+        for e in executions
+    ])

@@ -9,7 +9,7 @@ from uuid import UUID
 
 from app.models import (
     UserRole, RemixType, ReportedContentType, ReportReason, ReportStatus, ModerationActionType,
-    ApplicationStatus, CollaborationStatus, CollaboratorStatus,
+    ApplicationStatus, CollaborationStatus, CollaboratorStatus, AgentExecutionStatus,
 )
 
 
@@ -934,6 +934,52 @@ class FilterPresetResponse(BaseModel):
 
 class FilterPresetListResponse(BaseModel):
     presets: List[FilterPresetResponse]
+
+
+class AgentStep(BaseModel):
+    """One step of an AI agent's recipe - an existing AI Creator Studio
+    operation and the parameters to run it with"""
+    operation: str
+    params: dict = Field(default_factory=dict)
+
+
+class AIAgentResponse(BaseModel):
+    """A named recipe that chains existing AI operations"""
+    id: UUID
+    name: str
+    label: str
+    description: Optional[str] = None
+    steps: List[AgentStep]
+
+
+class AIAgentListResponse(BaseModel):
+    agents: List[AIAgentResponse]
+
+
+class AgentStepResult(BaseModel):
+    """The outcome of a single step within an agent execution"""
+    operation: str
+    status: str
+    credits_used: int = 0
+    result_id: Optional[UUID] = None
+    error: Optional[str] = None
+
+
+class AgentExecutionResponse(BaseModel):
+    """A single run of an agent against a segment"""
+    id: UUID
+    agent_id: UUID
+    segment_id: UUID
+    status: AgentExecutionStatus
+    steps_log: List[AgentStepResult]
+    total_credits_used: int
+    error_message: Optional[str] = None
+    started_at: datetime
+    completed_at: Optional[datetime] = None
+
+
+class AgentExecutionListResponse(BaseModel):
+    executions: List[AgentExecutionResponse]
 
 
 class CropSuggestion(BaseModel):

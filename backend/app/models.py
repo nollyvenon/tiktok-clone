@@ -1448,3 +1448,58 @@ class FilterPreset(Base):
     is_active = Column(Boolean, default=True, nullable=False)
 
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+# ============================================================================
+# MODULE 28: AI AGENTS
+# ============================================================================
+
+class AIAgent(Base):
+    """A named 'recipe' that runs a fixed sequence of the existing AI
+    Creator Studio operations (background removal, captions, color
+    correction, smart framing) against a segment in one call. This app
+    has no real LLM/agent-framework integration (no OPENAI_API_KEY is
+    ever actually used), so 'agent execution' here means orchestrating
+    the AI operations that already exist, not free-form LLM reasoning."""
+    __tablename__ = "ai_agents"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name = Column(String(100), unique=True, nullable=False)
+    label = Column(String(150), nullable=False)
+    description = Column(Text, nullable=True)
+    steps = Column(Text, nullable=False)  # JSON array of {operation, params}
+
+    sort_order = Column(Integer, default=0, nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False)
+
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class AgentExecutionStatus(str, enum.Enum):
+    """Status of an agent's run against a segment"""
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
+class AgentExecution(Base):
+    """A single run of an AIAgent against a segment - the audit trail of
+    which underlying AI operations ran, in what order, and what each one
+    cost in credits."""
+    __tablename__ = "agent_executions"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    agent_id = Column(UUID(as_uuid=True), ForeignKey("ai_agents.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    segment_id = Column(UUID(as_uuid=True), ForeignKey("segments.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    status = Column(
+        Enum(AgentExecutionStatus, values_callable=lambda e: [x.value for x in e]),
+        default=AgentExecutionStatus.RUNNING, nullable=False, index=True,
+    )
+    steps_log = Column(Text, nullable=True)  # JSON array of per-step results
+    total_credits_used = Column(Integer, default=0, nullable=False)
+    error_message = Column(String(500), nullable=True)
+
+    started_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    completed_at = Column(DateTime, nullable=True)
