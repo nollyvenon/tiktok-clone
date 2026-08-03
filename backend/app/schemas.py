@@ -9,6 +9,7 @@ from uuid import UUID
 
 from app.models import (
     UserRole, RemixType, ReportedContentType, ReportReason, ReportStatus, ModerationActionType,
+    ApplicationStatus,
 )
 
 
@@ -1414,6 +1415,80 @@ class ModerationDecisionResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# ============================================================================
+# Creator Fund Schemas
+# ============================================================================
+
+class FundingProgramCreate(BaseModel):
+    """Admin-only: define a new funding program"""
+    name: str = Field(..., max_length=255)
+    description: Optional[str] = None
+    min_followers: int = Field(0, ge=0)
+    min_published_videos: int = Field(0, ge=0)
+    min_total_views: int = Field(0, ge=0)
+    award_amount: int = Field(..., gt=0, description="Cents")
+
+
+class FundingProgramResponse(BaseModel):
+    """A funding program a creator can apply to"""
+    id: UUID
+    name: str
+    description: Optional[str] = None
+    min_followers: int
+    min_published_videos: int
+    min_total_views: int
+    award_amount: int
+    is_active: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class FundingProgramListResponse(BaseModel):
+    programs: List[FundingProgramResponse]
+
+
+class CreatorApplicationResponse(BaseModel):
+    """A creator's application to a funding program"""
+    id: UUID
+    program_id: UUID
+    user_id: UUID
+    followers_count: int
+    published_videos_count: int
+    total_views_count: int
+    meets_requirements: bool
+    status: ApplicationStatus
+    decision_reason: Optional[str] = None
+    awarded_amount: Optional[int] = None
+    reviewed_by: Optional[UUID] = None
+    reviewed_at: Optional[datetime] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class CreatorApplicationListResponse(BaseModel):
+    applications: List[CreatorApplicationResponse]
+    total: int
+    limit: int
+    offset: int
+
+
+class ApplicationDecisionRequest(BaseModel):
+    """Admin's approve/reject decision on a fund application"""
+    status: ApplicationStatus
+    decision_reason: Optional[str] = Field(None, max_length=1000)
+
+    @field_validator("status")
+    @classmethod
+    def validate_status(cls, v):
+        if v == ApplicationStatus.PENDING:
+            raise ValueError("Decision status must be 'approved' or 'rejected'")
+        return v
 
 
 # ============================================================================

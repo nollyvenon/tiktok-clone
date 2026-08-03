@@ -1287,3 +1287,71 @@ class ModerationDecision(Base):
     notes = Column(Text, nullable=True)
 
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+# ============================================================================
+# MODULE 27: CREATOR FUND
+# ============================================================================
+
+class FundingProgram(Base):
+    """An admin-defined funding program creators can apply to"""
+    __tablename__ = "funding_programs"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+
+    name = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+
+    # Eligibility requirements, checked against the applicant's live stats
+    min_followers = Column(Integer, default=0, nullable=False)
+    min_published_videos = Column(Integer, default=0, nullable=False)
+    min_total_views = Column(Integer, default=0, nullable=False)
+
+    # Amount awarded to an approved applicant, in cents - credited to an
+    # internal ledger only; this app has no real payment processor, so no
+    # money actually moves.
+    award_amount = Column(Integer, nullable=False)
+
+    is_active = Column(Boolean, default=True, nullable=False)
+
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+
+class ApplicationStatus(str, enum.Enum):
+    """Status of a creator's fund application"""
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+
+
+class CreatorApplication(Base):
+    """A creator's application to a funding program, with the eligibility
+    snapshot computed at application time and the admin's final decision"""
+    __tablename__ = "creator_applications"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    program_id = Column(UUID(as_uuid=True), ForeignKey("funding_programs.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    # Eligibility snapshot at time of application - requirements can change
+    # later without retroactively altering a pending application's basis
+    followers_count = Column(Integer, nullable=False)
+    published_videos_count = Column(Integer, nullable=False)
+    total_views_count = Column(Integer, nullable=False)
+    meets_requirements = Column(Boolean, nullable=False)
+
+    status = Column(
+        Enum(ApplicationStatus, values_callable=lambda e: [x.value for x in e]),
+        default=ApplicationStatus.PENDING, nullable=False, index=True,
+    )
+    decision_reason = Column(Text, nullable=True)
+    awarded_amount = Column(Integer, nullable=True)  # Cents, set on approval
+    reviewed_by = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    reviewed_at = Column(DateTime, nullable=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+
+    __table_args__ = (
+        UniqueConstraint('program_id', 'user_id', name='unique_program_applicant'),
+    )
