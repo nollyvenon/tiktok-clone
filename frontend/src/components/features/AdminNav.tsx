@@ -8,6 +8,7 @@ const TABS = [
   { href: '/admin/users', label: 'Users' },
   { href: '/admin/moderation', label: 'Reports' },
   { href: '/admin/audit-log', label: 'Audit Log' },
+  { href: '/admin/creator-fund', label: 'Creator Fund' },
 ];
 
 export default function AdminNav() {

@@ -1163,6 +1163,85 @@ export interface AdminAuditLogResult {
   offset: number;
 }
 
+export interface FundingProgram {
+  id: string;
+  name: string;
+  description: string | null;
+  min_followers: number;
+  min_published_videos: number;
+  min_total_views: number;
+  award_amount: number;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface CreatorApplication {
+  id: string;
+  program_id: string;
+  user_id: string;
+  followers_count: number;
+  published_videos_count: number;
+  total_views_count: number;
+  meets_requirements: boolean;
+  status: 'pending' | 'approved' | 'rejected';
+  decision_reason: string | null;
+  awarded_amount: number | null;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  created_at: string;
+}
+
+export interface CreatorApplicationListResult {
+  applications: CreatorApplication[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export const creatorFundApi = {
+  listPrograms: async () => {
+    const res = await client.get<{ programs: FundingProgram[] }>('/api/creator-fund/programs');
+    return res.data.programs;
+  },
+
+  applyToProgram: async (programId: string) => {
+    const res = await client.post<CreatorApplication>(`/api/creator-fund/programs/${programId}/apply`);
+    return res.data;
+  },
+
+  getMyApplications: async () => {
+    const res = await client.get<CreatorApplication[]>('/api/creator-fund/me/applications');
+    return res.data;
+  },
+
+  createProgram: async (data: {
+    name: string;
+    description?: string;
+    min_followers: number;
+    min_published_videos: number;
+    min_total_views: number;
+    award_amount: number;
+  }) => {
+    const res = await client.post<FundingProgram>('/api/creator-fund/programs', data);
+    return res.data;
+  },
+
+  listApplications: async (status?: string, limit = 20, offset = 0) => {
+    const res = await client.get<CreatorApplicationListResult>('/api/creator-fund/admin/applications', {
+      params: { status, limit, offset },
+    });
+    return res.data;
+  },
+
+  decideApplication: async (applicationId: string, status: 'approved' | 'rejected', decisionReason?: string) => {
+    const res = await client.post<CreatorApplication>(
+      `/api/creator-fund/admin/applications/${applicationId}/decide`,
+      { status, decision_reason: decisionReason }
+    );
+    return res.data;
+  },
+};
+
 export const adminApi = {
   getStats: async () => {
     const res = await client.get<AdminStats>('/api/admin/stats');
