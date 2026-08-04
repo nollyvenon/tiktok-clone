@@ -1645,3 +1645,67 @@ class Payout(Base):
 
     requested_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
     decided_at = Column(DateTime, nullable=True)
+
+
+# ============================================================================
+# MODULE 10: LIVE STREAMING
+# ============================================================================
+
+class LiveStreamStatus(str, enum.Enum):
+    """Status of a live stream session"""
+    LIVE = "live"
+    ENDED = "ended"
+
+
+class LiveStream(Base):
+    """A live stream session. This app has no RTMP ingest server or
+    WebRTC/HLS playback pipeline anywhere, so this models the *social*
+    layer of live streaming - a session a creator starts and ends, with
+    real viewer tracking and real chat - honestly, without pretending
+    any video is actually being transported."""
+    __tablename__ = "live_streams"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    creator_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    title = Column(String(255), nullable=False)
+
+    status = Column(
+        Enum(LiveStreamStatus, values_callable=lambda e: [x.value for x in e]),
+        default=LiveStreamStatus.LIVE, nullable=False, index=True,
+    )
+
+    viewer_count = Column(Integer, default=0, nullable=False)
+    peak_viewer_count = Column(Integer, default=0, nullable=False)
+
+    started_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    ended_at = Column(DateTime, nullable=True)
+
+
+class LiveStreamViewer(Base):
+    """A viewer's join/leave record for a live stream - lets viewer_count
+    be derived from real presence rather than a bare counter, and
+    prevents the same user inflating the count with repeat joins."""
+    __tablename__ = "live_stream_viewers"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    stream_id = Column(UUID(as_uuid=True), ForeignKey("live_streams.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    joined_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    left_at = Column(DateTime, nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint('stream_id', 'user_id', name='unique_stream_viewer'),
+    )
+
+
+class LiveChatMessage(Base):
+    """A chat message posted during a live stream"""
+    __tablename__ = "live_chat_messages"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    stream_id = Column(UUID(as_uuid=True), ForeignKey("live_streams.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    content = Column(String(500), nullable=False)
+
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)

@@ -10,7 +10,7 @@ from uuid import UUID
 from app.models import (
     UserRole, RemixType, ReportedContentType, ReportReason, ReportStatus, ModerationActionType,
     ApplicationStatus, CollaborationStatus, CollaboratorStatus, AgentExecutionStatus, ShopOrderStatus,
-    EarningSourceType, PayoutStatus,
+    EarningSourceType, PayoutStatus, LiveStreamStatus,
 )
 
 
@@ -1124,6 +1124,49 @@ class EarningsSummaryResponse(BaseModel):
     pending_payout_total: int
     available_balance: int
     earnings: List[EarningResponse]
+
+
+# ============================================================================
+# Live Streaming Schemas
+# ============================================================================
+
+class LiveStreamStartRequest(BaseModel):
+    title: str = Field(..., max_length=255)
+
+
+class LiveStreamResponse(BaseModel):
+    id: UUID
+    creator_id: UUID
+    title: str
+    status: LiveStreamStatus
+    viewer_count: int
+    peak_viewer_count: int
+    started_at: datetime
+    ended_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class LiveStreamListResponse(BaseModel):
+    streams: List[LiveStreamResponse]
+
+
+class LiveChatMessageCreate(BaseModel):
+    content: str = Field(..., min_length=1, max_length=500)
+
+
+class LiveChatMessageResponse(BaseModel):
+    id: UUID
+    stream_id: UUID
+    user_id: UUID
+    username: str
+    content: str
+    created_at: datetime
+
+
+class LiveChatMessageListResponse(BaseModel):
+    messages: List[LiveChatMessageResponse]
 
 
 class CropSuggestion(BaseModel):
