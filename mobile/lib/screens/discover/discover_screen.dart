@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../models/hashtag_trend.dart';
 import '../../services/hashtag_service.dart';
+import '../live/live_discovery_screen.dart';
 import 'challenge_detail_screen.dart';
 import 'hashtag_analytics_screen.dart';
 
@@ -49,7 +50,18 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Discover')),
+      appBar: AppBar(
+        title: const Text('Discover'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.podcasts_outlined),
+            tooltip: 'Live',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const LiveDiscoveryScreen()),
+            ),
+          ),
+        ],
+      ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
