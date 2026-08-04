@@ -1532,6 +1532,68 @@ export const monetizationApi = {
   },
 };
 
+export interface LiveStream {
+  id: string;
+  creator_id: string;
+  title: string;
+  status: 'live' | 'ended';
+  viewer_count: number;
+  peak_viewer_count: number;
+  started_at: string;
+  ended_at: string | null;
+}
+
+export interface LiveChatMessage {
+  id: string;
+  stream_id: string;
+  user_id: string;
+  username: string;
+  content: string;
+  created_at: string;
+}
+
+export const liveApi = {
+  startStream: async (title: string) => {
+    const res = await client.post<LiveStream>('/api/live/start', { title });
+    return res.data;
+  },
+
+  listLiveStreams: async () => {
+    const res = await client.get<{ streams: LiveStream[] }>('/api/live');
+    return res.data.streams;
+  },
+
+  getStream: async (streamId: string) => {
+    const res = await client.get<LiveStream>(`/api/live/${streamId}`);
+    return res.data;
+  },
+
+  endStream: async (streamId: string) => {
+    const res = await client.post<LiveStream>(`/api/live/${streamId}/end`);
+    return res.data;
+  },
+
+  joinStream: async (streamId: string) => {
+    const res = await client.post<LiveStream>(`/api/live/${streamId}/join`);
+    return res.data;
+  },
+
+  leaveStream: async (streamId: string) => {
+    const res = await client.post<LiveStream>(`/api/live/${streamId}/leave`);
+    return res.data;
+  },
+
+  postChatMessage: async (streamId: string, content: string) => {
+    const res = await client.post<LiveChatMessage>(`/api/live/${streamId}/chat`, { content });
+    return res.data;
+  },
+
+  getChatMessages: async (streamId: string) => {
+    const res = await client.get<{ messages: LiveChatMessage[] }>(`/api/live/${streamId}/chat`);
+    return res.data.messages;
+  },
+};
+
 export const adminApi = {
   getStats: async () => {
     const res = await client.get<AdminStats>('/api/admin/stats');

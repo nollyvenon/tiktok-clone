@@ -25,6 +25,7 @@ import {
   BarChart3,
   Settings,
   Receipt,
+  Radio,
 } from 'lucide-react';
 
 export function Navbar() {
@@ -80,6 +81,10 @@ export function Navbar() {
             <Link href="/discover" className="flex items-center gap-2 hover:text-pink-600 transition">
               <Compass className="w-5 h-5" />
               <span>Discover</span>
+            </Link>
+            <Link href="/live" className="flex items-center gap-2 hover:text-pink-600 transition">
+              <Radio className="w-5 h-5" />
+              <span>Live</span>
             </Link>
             <Link href="/create" className="flex items-center gap-2 hover:text-pink-600 transition">
               <Plus className="w-5 h-5" />
@@ -225,6 +230,13 @@ export function Navbar() {
             >
               <Compass className="w-5 h-5" />
               <span>Discover</span>
+            </Link>
+            <Link
+              href="/live"
+              className="flex items-center gap-2 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded"
+            >
+              <Radio className="w-5 h-5" />
+              <span>Live</span>
             </Link>
             <Link
               href="/create"
