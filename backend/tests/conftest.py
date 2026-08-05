@@ -6,10 +6,24 @@ import pytest
 import pytest_asyncio
 from sqlalchemy import event
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from sqlalchemy.ext.compiler import compiles
+from sqlalchemy.dialects.postgresql import UUID
 from app.database import Base
 from app.main import app
 from app.database import get_db
 from httpx import AsyncClient, ASGITransport
+
+
+# postgresql.UUID has no SQLite rendering in the currently installed
+# SQLAlchemy environment (GenericTypeCompiler has visit_uuid but not the
+# visit_UUID this dialect-specific type dispatches to), which breaks
+# Base.metadata.create_all against the in-memory SQLite test database
+# below. Every model in this app uses postgresql.UUID directly since the
+# real database is always Postgres - this shim is test-only and doesn't
+# change anything about production behavior.
+@compiles(UUID, "sqlite")
+def _compile_uuid_sqlite(element, compiler, **kw):
+    return "CHAR(32)"
 
 
 # Test database
