@@ -15,7 +15,13 @@ depends_on = None
 
 
 def upgrade():
-    op.execute("ALTER TYPE oauthprovider ADD VALUE IF NOT EXISTS 'tiktok'")
+    # oauth_tokens.provider was created as a plain VARCHAR(50) in migration
+    # 001 (op.create_table used sa.Column('provider', sa.String(50), ...)),
+    # not a native Postgres ENUM type - so there is no 'oauthprovider' type
+    # to alter, and none is needed: a VARCHAR column already accepts any
+    # string value up to its length, including 'tiktok'. This migration is
+    # a no-op against the schema as it actually exists.
+    pass
 
 
 def downgrade():

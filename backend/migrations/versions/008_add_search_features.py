@@ -24,7 +24,6 @@ def upgrade():
     op.create_index('ix_videos_hashtags', 'videos', ['hashtags'])
 
     # Add index for creator search
-    op.create_index('ix_users_username', 'users', ['username'])
     op.create_index('ix_users_first_name', 'users', ['first_name'])
     op.create_index('ix_users_last_name', 'users', ['last_name'])
 

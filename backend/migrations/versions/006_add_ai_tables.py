@@ -36,7 +36,6 @@ def upgrade() -> None:
     )
     op.create_index('ix_ai_generations_user_id', 'ai_generations', ['user_id'])
     op.create_index('ix_ai_generations_draft_id', 'ai_generations', ['draft_id'])
-    op.create_index('ix_ai_generations_operation_type', 'ai_generations', ['operation_type'])
     op.create_index('ix_ai_generations_status', 'ai_generations', ['status'])
 
     # Create background_removals table
@@ -125,7 +124,6 @@ def upgrade() -> None:
     )
     op.create_index('ix_sound_recommendations_user_id', 'sound_recommendations', ['user_id'])
     op.create_index('ix_sound_recommendations_draft_id', 'sound_recommendations', ['draft_id'])
-    op.create_index('ix_sound_recommendations_category', 'sound_recommendations', ['category'])
     op.create_index('ix_sound_recommendations_mood', 'sound_recommendations', ['mood'])
 
     # Create color_corrections table
@@ -193,7 +191,6 @@ def upgrade() -> None:
     )
     op.create_index('ix_trend_suggestions_user_id', 'trend_suggestions', ['user_id'])
     op.create_index('ix_trend_suggestions_draft_id', 'trend_suggestions', ['draft_id'])
-    op.create_index('ix_trend_suggestions_trend_type', 'trend_suggestions', ['trend_type'])
     op.create_index('ix_trend_suggestions_region', 'trend_suggestions', ['region'])
 
 
