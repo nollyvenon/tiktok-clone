@@ -9,14 +9,14 @@ every other `MODULE_NN_VERIFIED.md` doc from Module 16 onward this
 session). Rather than overwrite real prior documentation, this module
 uses a distinct filename.
 
-**Verification status: deferred.** The user paused running tests/builds
-mid-session (2026-08-03) until the whole app is declared complete.
-Everything in this module was written to the same standard as every
-prior module (real HTTP-level tests, real UI wiring end to end, no
-faked behavior) but the backend test suite, `tsc`/`next build`, and
-`flutter analyze`/`flutter test` have **not been run** for this
-module's changes yet - that happens in the deferred, whole-app
-verification pass.
+**Verification status: complete.** Written during a test/build pause
+(2026-08-03); verified in the deferred whole-app pass afterward
+(2026-08-04) - see Verification performed below. All 13 of this
+module's tests pass as part of the full 370/370 backend suite. That
+pass also caught and fixed a genuine, unrelated environment regression
+(see the note in Verification performed) - not a bug in this module's
+code, but proof the deferred pass was worth running rather than trusting
+the "written but not run" tests blind.
 
 ---
 
@@ -87,7 +87,7 @@ that isn't there.
   `POST /live/{id}/end`, `POST /live/{id}/join`, `POST /live/{id}/leave`,
   `POST /live/{id}/chat`, `GET /live/{id}/chat`.
 - Migration `024_add_live_streaming_tables.py`.
-- 13 new HTTP-level tests (written, not yet run): start/list, rejecting
+- 13 new HTTP-level tests, all passing: start/list, rejecting
   a second concurrent stream, ending a stream removes it from the live
   list, non-owner blocked from ending, join incrementing and leave
   decrementing viewer count (with peak preserved), repeated join being
@@ -120,6 +120,22 @@ that isn't there.
 
 ---
 
+## Verification performed
+
+- Backend: `pytest tests/ -W error::RuntimeWarning` - **370/370
+  passing** (13 of those in `test_live_streaming.py`, all passing).
+  This run also caught a genuine, unrelated environment regression:
+  the installed SQLAlchemy environment had lost the ability to compile
+  `postgresql.UUID` columns against the SQLite test database (not a
+  code bug in any module - `Base.metadata.create_all` itself was
+  failing on the `users` table, unrelated to anything built this
+  session). Fixed with a test-only `@compiles(UUID, 'sqlite')` shim in
+  `tests/conftest.py`; changes nothing about production behavior since
+  production always runs real Postgres.
+- Web: `npx tsc --noEmit` clean; `next build` succeeds, 35 routes
+  including `/live` and `/live/[streamId]`.
+- Mobile: `flutter analyze` - 0 issues; `flutter test` - 2/2 passing.
+
 ## Known gaps
 
 - **No actual video transport** - no RTMP ingest, no HLS/WebRTC
@@ -134,8 +150,6 @@ that isn't there.
   orders, not live streams.
 - No moderation tools specific to live chat (no per-stream mute/ban) -
   general user blocking still applies but isn't stream-scoped.
-- Verification (tests, `next build`, `flutter analyze`/`test`) has not
-  been run for this module - see the note at the top of this doc.
 
 Unchanged from prior modules: web token storage in `localStorage`, no
 mobile OAuth, no rate limiting, no Redis caching, offset-based feed
@@ -151,4 +165,5 @@ built to full real-infrastructure standard where that was possible, or
 honestly scoped to the largest genuinely-buildable subset where it
 wasn't (payments, live video). The deferred verification pass across
 everything built since the pause began (Modules 16, 18, and this one)
-is the natural next step before calling the app complete.
+is now complete: full backend suite (370/370), `tsc`/`next build`
+clean, `flutter analyze`/`flutter test` clean.

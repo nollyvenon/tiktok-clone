@@ -1,13 +1,9 @@
 # Module 18: Monetization — Verified Documentation
 
-**Verification status: deferred.** The user paused running tests/builds
-mid-session (2026-08-03) until the whole app is declared complete.
-Everything in this module was written to the same standard as every
-prior module (real HTTP-level tests, real UI wiring end to end, no
-faked behavior) but the backend test suite, `tsc`/`next build`, and
-`flutter analyze`/`flutter test` have **not been run** for this
-module's changes yet - that happens in the deferred, whole-app
-verification pass.
+**Verification status: complete.** Written during a test/build pause
+(2026-08-03); verified in the deferred whole-app pass afterward
+(2026-08-04) - see Verification performed below. All 12 of this
+module's tests pass as part of the full 370/370 backend suite.
 
 ---
 
@@ -70,7 +66,7 @@ functionality, not a UI shell around numbers that don't mean anything.
   `GET /monetization/payouts/me`, `GET /monetization/admin/payouts`,
   `POST /monetization/admin/payouts/{id}/decide`.
 - Migration `023_add_monetization_tables.py`.
-- 12 new HTTP-level tests (written, not yet run): zero-earnings summary,
+- 12 new HTTP-level tests, all passing: zero-earnings summary,
   a Creator Fund approval crediting an earning, a Shop order fulfillment
   crediting an earning, requesting a payout within balance, exceeding
   balance rejected, a pending payout reducing what a second request can
@@ -97,6 +93,15 @@ functionality, not a UI shell around numbers that don't mean anything.
   following the precedent set in Module 25 (Admin Dashboard).
 
 ---
+
+## Verification performed
+
+- Backend: `pytest tests/ -W error::RuntimeWarning` - **370/370
+  passing** as part of the full deferred-pass run (12 of those in
+  `test_monetization.py`, all passing).
+- Web: `npx tsc --noEmit` clean; `next build` succeeds, 35 routes
+  including `/monetization` and `/admin/payouts`.
+- Mobile: `flutter analyze` - 0 issues; `flutter test` - 2/2 passing.
 
 ## Known gaps
 

@@ -1,13 +1,9 @@
 # Module 16: Creator Shop — Verified Documentation
 
-**Verification status: deferred.** The user paused running tests/builds
-mid-session (2026-08-03) until the whole app is declared complete.
-Everything in this module was written to the same standard as every
-prior module (real HTTP-level tests, real UI wiring end to end, no
-faked behavior) but the backend test suite, `tsc`/`next build`, and
-`flutter analyze`/`flutter test` have **not been run** for this
-module's changes yet - that happens in the deferred, whole-app
-verification pass.
+**Verification status: complete.** Written during a test/build pause
+(2026-08-03); verified in the deferred whole-app pass afterward
+(2026-08-04) - see Verification performed below. All 20 of this
+module's tests pass as part of the full 370/370 backend suite.
 
 ---
 
@@ -69,7 +65,7 @@ order existing with a status.
   `GET /shop/{shop_id}`, so a request like `/shop/orders/me` can't be
   misrouted into the single-segment shop-by-id handler.
 - Migration `022_add_creator_shop_tables.py`.
-- 20 new HTTP-level tests (written, not yet run): shop create/update/
+- 20 new HTTP-level tests, all passing: shop create/update/
   404-when-none, product creation requires a shop, viewing a shop by id
   and by user id (plus the 400 when a user has no shop), product-update
   ownership (403 for a non-owner), soft-delete, order placement
@@ -105,6 +101,15 @@ order existing with a status.
   `ProfileScreen` when they have a shop.
 
 ---
+
+## Verification performed
+
+- Backend: `pytest tests/ -W error::RuntimeWarning` - **370/370
+  passing** as part of the full deferred-pass run (20 of those in
+  `test_shop.py`, all passing).
+- Web: `npx tsc --noEmit` clean; `next build` succeeds, 35 routes
+  including `/shop/manage`, `/shop/[shopId]`, `/shop/orders`.
+- Mobile: `flutter analyze` - 0 issues; `flutter test` - 2/2 passing.
 
 ## Known gaps
 
