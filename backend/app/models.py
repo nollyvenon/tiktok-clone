@@ -41,7 +41,16 @@ class User(Base):
     is_active = Column(Boolean, default=True, nullable=False)
     is_verified = Column(Boolean, default=False, nullable=False)
     is_creator = Column(Boolean, default=False, nullable=False)
-    role = Column(Enum(UserRole), default=UserRole.USER, nullable=False)
+    # native_enum=False: migration 001 created this column as a plain
+    # VARCHAR, not a native Postgres ENUM type - native_enum=True (the
+    # default) would make SQLAlchemy try to bind/cast to a "userrole" type
+    # that doesn't exist. values_callable stores the lowercase .value
+    # ("admin") matching the migrations' server_default, not the
+    # uppercase .name Enum would otherwise use by default.
+    role = Column(
+        Enum(UserRole, native_enum=False, values_callable=lambda e: [x.value for x in e]),
+        default=UserRole.USER, nullable=False,
+    )
 
     # 2FA
     two_factor_enabled = Column(Boolean, default=False, nullable=False)
@@ -105,7 +114,10 @@ class OAuthToken(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    provider = Column(Enum(OAuthProvider), nullable=False, index=True)
+    provider = Column(
+        Enum(OAuthProvider, native_enum=False, values_callable=lambda e: [x.value for x in e]),
+        nullable=False, index=True,
+    )
     provider_user_id = Column(String(255), nullable=False)
 
     # Tokens
@@ -156,7 +168,10 @@ class OTP(Base):
     phone_number = Column(String(20), nullable=True)
     email = Column(String(255), nullable=True)
     code = Column(String(6), nullable=False)
-    verification_type = Column(Enum(OTPVerificationType), nullable=False, index=True)
+    verification_type = Column(
+        Enum(OTPVerificationType, native_enum=False, values_callable=lambda e: [x.value for x in e]),
+        nullable=False, index=True,
+    )
 
     # Status
     is_verified = Column(Boolean, default=False, nullable=False)
@@ -282,7 +297,10 @@ class Video(Base):
     remix_type = Column(Enum(RemixType), nullable=True)
 
     # Status & Visibility
-    status = Column(Enum(VideoStatus), default=VideoStatus.DRAFT, nullable=False, index=True)
+    status = Column(
+        Enum(VideoStatus, native_enum=False, values_callable=lambda e: [x.value for x in e]),
+        default=VideoStatus.DRAFT, nullable=False, index=True,
+    )
     is_public = Column(Boolean, default=True, nullable=False)
     is_pinned = Column(Boolean, default=False, nullable=False)
     allow_comments = Column(Boolean, default=True, nullable=False)
@@ -402,7 +420,10 @@ class Upload(Base):
     storage_path = Column(String(500), nullable=False)  # S3 or local path
 
     # Processing
-    status = Column(Enum(UploadStatus), default=UploadStatus.UPLOADING, nullable=False, index=True)
+    status = Column(
+        Enum(UploadStatus, native_enum=False, values_callable=lambda e: [x.value for x in e]),
+        default=UploadStatus.UPLOADING, nullable=False, index=True,
+    )
     progress = Column(Integer, default=0, nullable=False)  # 0-100%
     error_message = Column(Text, nullable=True)
 
@@ -455,7 +476,10 @@ class Draft(Base):
     music_id = Column(UUID(as_uuid=True), ForeignKey("sound_recommendations.id", ondelete="SET NULL"), nullable=True)
 
     # Status
-    status = Column(Enum(DraftStatus), default=DraftStatus.EDITING, nullable=False, index=True)
+    status = Column(
+        Enum(DraftStatus, native_enum=False, values_callable=lambda e: [x.value for x in e]),
+        default=DraftStatus.EDITING, nullable=False, index=True,
+    )
     scheduled_publish_at = Column(DateTime, nullable=True)
 
     # Timestamps
@@ -600,7 +624,10 @@ class AIGeneration(Base):
 
     # Operation details
     operation_type = Column(String(50), nullable=False, index=True)  # voiceover, caption, background, etc.
-    status = Column(Enum(AIGenerationStatus), default=AIGenerationStatus.PENDING, nullable=False)
+    status = Column(
+        Enum(AIGenerationStatus, native_enum=False, values_callable=lambda e: [x.value for x in e]),
+        default=AIGenerationStatus.PENDING, nullable=False,
+    )
 
     # Parameters and results
     input_data = Column(String(2000), nullable=True)  # JSON input parameters
